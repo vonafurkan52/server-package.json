@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Node.js 24 Kur
+      - name: Node.js Kur
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -25,14 +25,53 @@ jobs:
       - name: Rust Kur
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Eksik Ikonlari Otomatik Olustur ve .exe Derle
-        working-directory: ./client
+      - name: Eksik Dosyalari Tamamla ve .exe Derle
+        shell: powershell
         run: |
+          # Klasor yapisi eksikse otomatik olustur
+          New-Item -ItemType Directory -Force -Path "client/src"
+          New-Item -ItemType Directory -Force -Path "client/src-tauri/src"
+          New-Item -ItemType Directory -Force -Path "client/src-tauri/icons"
+
+          # Eger index.html yanlislikla ana dizine yuklendiyse dogru yere tasi, yoksa olustur
+          if (Test-Path "index.html") { Copy-Item "index.html" "client/src/index.html" -Force }
+          if (!(Test-Path "client/src/index.html")) {
+            Set-Content -Path "client/src/index.html" -Value '<!DOCTYPE html><html><body style="background:#121214;color:#fff;"><h2>Ekip Ses Hazir</h2></body></html>'
+          }
+
+          # package.json olustur
+          Set-Content -Path "client/package.json" -Value '{"name":"ekip-ses","version":"1.0.0","dependencies":{"@tauri-apps/cli":"1.5.14"}}'
+
+          # Cargo.toml olustur
+          Set-Content -Path "client/src-tauri/Cargo.toml" -Value '[package]
+          name = "ekip-ses"
+          version = "1.0.0"
+          edition = "2021"
+          [build-dependencies]
+          tauri-build = { version = "1.5", features = [] }
+          [dependencies]
+          tauri = { version = "1.5", features = ["shell-open"] }
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          [features]
+          custom-protocol = ["tauri/custom-protocol"]'
+
+          # build.rs ve main.rs olustur
+          Set-Content -Path "client/src-tauri/build.rs" -Value 'fn main() { tauri_build::build() }'
+          Set-Content -Path "client/src-tauri/src/main.rs" -Value '#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] fn main() { tauri::Builder::default().run(tauri::generate_context!()).expect("error"); }'
+
+          # tauri.conf.json olustur (Ikon hatasi vermemesi icin optimize edildi)
+          Set-Content -Path "client/src-tauri/tauri.conf.json" -Value '{"build":{"devPath":"../src","distDir":"../src","withGlobalTauri":true},"package":{"productName":"EkipSes","version":"1.0.0"},"tauri":{"allowlist":{"all":false},"bundle":{"active":false,"icon":["icons/icon.ico"]},"security":{"csp":null},"windows":[{"title":"Ekip Ses & Muzik","width":480,"height":600}]}}'
+
+          # Windows icin zorunlu olan gecerli 1x1 PNG dosyasini olustur ve .ico uret
+          Set-Location client
           npm install
-          mkdir -p src-tauri/icons
-          node -e "const fs=require('fs'); const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==','base64'); fs.writeFileSync('icon.png',png);"
+          $pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAALUlEQVR42u3OMQEAAAgDoJvc6FEOhpg0gUAgEAgEAoFAIBAIBAKBQCAQCAT+LS48AAH5p4L7AAAAAElFTkSuQmCC"
+          [IO.File]::WriteAllBytes("icon.png", [Convert]::FromBase64String($pngBase64))
           npx tauri icon icon.png
-          npx tauri build --no-bundle
+
+          # .exe dosyasini derle
+          npx tauri build
 
       - name: .exe Dosyasini Indirmeye Hazirla
         uses: actions/upload-artifact@v4
