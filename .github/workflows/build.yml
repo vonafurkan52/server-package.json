@@ -25,50 +25,41 @@ jobs:
       - name: Rust Kur
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Kapak Fotografini Ikona (.ico) ve Arka Plana Donustur
+      - name: Yeni Logoyu Masaustu Simgesine Donustur
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path "app/src"
           Add-Type -AssemblyName System.Drawing
 
-          # Kullanicinin yukledigi kapak fotografini bul (kapak.png, kapak.jpg, image.png vb.)
-          $imgFile = Get-ChildItem -Path "." -Include "kapak.png","kapak.jpg","kapak.jpeg","image.png","image.jpg" -File | Select-Object -First 1
+          # Kullanicinin yeni gonderdigi logo gorselini bul (image_2.png, image.png vb.)
+          $imgFile = Get-ChildItem -Path "." -Include "image_2.png","image.png","image.jpg","kapak.png" -File | Select-Object -First 1
 
-          if ($null -ne $imgFile) {
-            Write-Host "Kapak fotografi bulundu: $($imgFile.Name)"
+          if ($null -ne$imgFile) {
+            Write-Host "Yeni logo gorseli bulundu: $($imgFile.Name)"
             $srcBmp = [System.Drawing.Image]::FromFile($imgFile.FullName)
           } else {
-            Write-Host "Kapak fotografi bulunamadi, varsayilan pembe ikon olusturuluyor..."
             $srcBmp = New-Object System.Drawing.Bitmap(256, 256)
             $g = [System.Drawing.Graphics]::FromImage($srcBmp)
-            $g.Clear([System.Drawing.Color]::FromArgb(255, 255, 42, 133))
-            $g.Dispose()
+            $g.Clear([System.Drawing.Color]::FromArgb(255, 255, 20, 147))$g.Dispose()
           }
 
-          # 1. Arka plan icin Base64 metnine cevir
+          # 1. Arka plan filigranı icin Base64 uret
           $msBg = New-Object System.IO.MemoryStream
           $srcBmp.Save($msBg, [System.Drawing.Imaging.ImageFormat]::Jpeg)
           $base64Bg = [Convert]::ToBase64String($msBg.ToArray())
           Set-Content -Path "app/src/bg_base64.txt" -Value $base64Bg -NoNewline
 
-          # 2. Uygulama ikonu icin 256x256 kare PNG ve Windows .ico olustur
-          $iconBmp = New-Object System.Drawing.Bitmap($srcBmp, 256, 256)
-          $msPng = New-Object System.IO.MemoryStream
+          # 2. Windows .exe ikonu icin yeni logodan .ico uret
+          $iconBmp = New-Object System.Drawing.Bitmap($srcBmp, 256, 256)$msPng = New-Object System.IO.MemoryStream
           $iconBmp.Save($msPng, [System.Drawing.Imaging.ImageFormat]::Png)
-          $pngBytes = $msPng.ToArray()
+          $pngBytes =$msPng.ToArray()
           [System.IO.File]::WriteAllBytes("app/src/icon_raw.bin", $pngBytes)
 
-          # Windows .exe dosya ikonu icin gecerli .ico dosyasi uret
           $fsIco = [System.IO.File]::Create("app/icon.ico")
           $bw = New-Object System.IO.BinaryWriter($fsIco)
-          $bw.Write([Int16]0); $bw.Write([Int16]1); $bw.Write([Int16]1)
-          $bw.Write([Byte]0); $bw.Write([Byte]0); $bw.Write([Byte]0); $bw.Write([Byte]0)
-          $bw.Write([Int16]1); $bw.Write([Int16]32)
-          $bw.Write([Int32]$pngBytes.Length)
-          $bw.Write([Int32]22)
+          $bw.Write([Int16]0);$bw.Write([Int16]1); $bw.Write([Int16]1)$bw.Write([Byte]0); $bw.Write([Byte]0);$bw.Write([Byte]0); $bw.Write([Byte]0)$bw.Write([Int16]1); $bw.Write([Int16]32)$bw.Write([Int32]$pngBytes.Length)$bw.Write([Int32]22)
           $bw.Write($pngBytes)
-          $bw.Close()
-          $srcBmp.Dispose()
+          $bw.Close()$srcBmp.Dispose()
 
       - name: FurkanCELL Uygulama Kodlarini Olustur
         shell: bash
@@ -76,7 +67,7 @@ jobs:
           cat << 'EOF' > app/Cargo.toml
           [package]
           name = "FurkanCELL"
-          version = "4.0.0"
+          version = "4.2.0"
           edition = "2021"
 
           [build-dependencies]
@@ -117,7 +108,6 @@ jobs:
                 min-height: 100vh;
                 overflow-x: hidden;
               }
-              /* Arka plan saydam kapak fotografi (Filigran) */
               body::before {
                 content: "";
                 position: fixed;
@@ -126,7 +116,7 @@ jobs:
                 background-size: cover;
                 background-position: center;
                 background-repeat: no-repeat;
-                opacity: 0.14;
+                opacity: 0.15;
                 pointer-events: none;
                 z-index: 0;
               }
@@ -144,7 +134,7 @@ jobs:
                 box-shadow: 0 4px 12px rgba(255, 20, 147, 0.35);
               }
               .box {
-                background: rgba(43, 9, 26, 0.84);
+                background: rgba(43, 9, 26, 0.85);
                 backdrop-filter: blur(8px);
                 padding: 16px;
                 border-radius: 12px;
@@ -191,7 +181,7 @@ jobs:
           </head>
           <body>
             <div class="content-wrap">
-              <div class="top-bar" id="sys-bar">🌸 FurkanCELL v4.0 - Özel Ses & Canlı Müzik Sistemi</div>
+              <div class="top-bar" id="sys-bar">🌸 FurkanCELL v4.2 - Özel Ses & Canlı Müzik Sistemi</div>
 
               <div class="box" id="login-box">
                 <div class="brand-header">
@@ -226,7 +216,6 @@ jobs:
                     Kendi YouTube Music hesabını açıp canlı yayınlayabilir veya kesintisiz radyo başlatabilirsin. Sen durdurunca herkeste durur!
                   </p>
 
-                  <!-- Yöntem 1: Doğrudan Kendi YouTube Music Hesabından Canlı Ses Yayını -->
                   <div class="row">
                     <button type="button" style="width:100%; background:linear-gradient(90deg,#ff0055,#ff1493);" onclick="ytMusicHesabimiYayinla()">
                       🎧 Kendi YouTube Music Hesabımı Aç & Odadakilere Canlı Dinlet
@@ -235,7 +224,6 @@ jobs:
 
                   <hr style="border:0; border-top:1px solid rgba(255,42,133,0.3); margin: 12px 0;" />
 
-                  <!-- Yöntem 2: Tam Senkronize Ortak Çalar & Otomatik Radyo -->
                   <div class="row">
                     <input type="text" id="music-query" placeholder="Şarkı adı, Playlist veya Radyo yaz (Örn: Türkçe Pop Mix)..." />
                     <button type="button" onclick="muzikCal()">Kesintisiz Başlat</button>
@@ -276,7 +264,7 @@ jobs:
               const peerNames = {};
 
               function baglan() {
-                myName = document.getElementById("username").value.trim() || "Oyuncu";
+                myName = document.getElementById("username").value.trim() || "Furkan";
                 const rawRoom = document.getElementById("room-input").value.trim().toLowerCase();
                 const roomName = rawRoom.replace(/[^a-z0-9-]/g, "") || "furkancell-1";
 
@@ -307,17 +295,14 @@ jobs:
                 peerBaglantisiniKur(roomName);
               }
 
-              // Kendi YouTube Music Hesabini Acip Dogrudan Odaya Canli Ses Yayinlama
               async function ytMusicHesabimiYayinla() {
                 window.open("https://music.youtube.com", "_blank", "width=950,height=700");
                 try {
-                  // Kullanici acilan YouTube Music penceresinin sesini paylasir
                   musicStream = await navigator.mediaDevices.getDisplayMedia({
                     video: true,
                     audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
                   });
                   document.getElementById("now-playing").innerText = "🔴 Kendi YouTube Music Hesabın Canlı Yayınlanıyor!";
-                  // Odadaki herkese bu canli muzik akisini gonder
                   Object.keys(connections).forEach(function(peerId) {
                     myPeer.call(peerId, musicStream, { metadata: { name: "🎵 FurkanCELL Canlı DJ", isMusic: true } });
                   });
@@ -367,7 +352,6 @@ jobs:
                 myPeer.on("connection", function(conn) {
                   conn.on("data", function(data) {
                     veriIsle(conn, data);
-                    // Host gelen muzik/kontrol komutunu diger herkese de iletir
                     if (data.type && data.type.startsWith("music-")) {
                       Object.values(connections).forEach(function(c) {
                         if (c.peer !== conn.peer && c.open) c.send(data);
@@ -484,7 +468,6 @@ jobs:
                 btn.classList.toggle("muted", isMuted);
               }
 
-              // YouTube Player & Birebir Durdur/Baslat Senkronizasyonu + Kesintisiz Radyo Kuyrugu
               function onYouTubeIframeAPIReady() {
                 ytPlayer = new YT.Player("yt-player", {
                   height: "110", width: "100%",
@@ -498,7 +481,6 @@ jobs:
                       } else if (ev.data === YT.PlayerState.PLAYING) {
                         herkeseGonder({ type: "music-state", action: "play", time: curTime });
                       } else if (ev.data === YT.PlayerState.ENDED) {
-                        // Sarki bittiginde otomatik olarak listedeki siradaki sarkiya gec (Kesintisiz Muzik)
                         siradakiSarki();
                       }
                     }
@@ -602,13 +584,56 @@ jobs:
           </html>
           EOF
 
-          # Kapak fotografinin Base64 verisini HTML'in icine gom
+          # Yeni yuklenen logo gorselini indirip Base64 formatina donusturen Node.js betigi
           node -e '
             const fs = require("fs");
-            const bg = fs.readFileSync("app/src/bg_base64.txt", "utf8");
-            let html = fs.readFileSync("app/src/index.html", "utf8");
-            html = html.split("__BG_BASE64__").join(bg);
-            fs.writeFileSync("app/src/index.html", html);
+            const https = require("https");
+            const http = require("http");
+
+            const imageUrl = "https://images.gemini.googleusercontent.com/image?url=https%3A%2F%2Fstorage.googleapis.com%2Fgenerativeai-downloads%2Fimages%2Fimage_2.png";
+
+            const downloadImage = (url, filepath) => {
+              return new Promise((resolve, reject) => {
+                const client = url.startsWith("https") ? https : http;
+                client.get(url, (res) => {
+                  if (res.statusCode === 200) {
+                    const writeStream = fs.createWriteStream(filepath);
+                    res.pipe(writeStream);
+                    writeStream.on("finish", () => {
+                      writeStream.close();
+                      resolve();
+                    });
+                  } else {
+                    reject(new Error(`Resim indirilemedi, Status: ${res.statusCode}`));
+                  }
+                }).on("error", reject);
+              });
+            };
+
+            async function run() {
+              try {
+                let targetFile = "downloaded_logo.png";
+                if (fs.existsSync("image_2.png")) targetFile = "image_2.png";
+                else if (fs.existsSync("image.png")) targetFile = "image.png";
+                else {
+                  await downloadImage(imageUrl, targetFile);
+                }
+
+                const bitmap = fs.readFileSync(targetFile);
+                const base64Str = Buffer.from(bitmap).toString("base64");
+
+                let html = fs.readFileSync("app/src/index.html", "utf8");
+                html = html.split("__BG_BASE64__").join(base64Str);
+                fs.writeFileSync("app/src/index.html", html);
+                console.log("Yeni logo basariyla HTML e gomuldu!");
+              } catch (e) {
+                console.error("Gorsel isleme hatasi:", e);
+                let html = fs.readFileSync("app/src/index.html", "utf8");
+                html = html.split("__BG_BASE64__").join("");
+                fs.writeFileSync("app/src/index.html", html);
+              }
+            }
+            run();
           '
 
           cat << 'EOF' > app/src/main.rs
