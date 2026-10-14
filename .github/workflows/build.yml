@@ -25,19 +25,20 @@ jobs:
       - name: Rust Kur
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Yeni Logoyu Masaustu Simgesine Donustur
+      - name: Sabit FurkanCELL Simgesini ve Arka Plani Olustur
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path "app/src"
           Add-Type -AssemblyName System.Drawing
 
-          # Kullanicinin yeni gonderdigi logo gorselini bul (image_2.png, image.png vb.)
+          # Kullanicinin yukledigi resmi bulmaya calis, bulamazsa harika bir pembe/sari FurkanCELL temasi uretir
           $imgFile = Get-ChildItem -Path "." -Include "image_2.png","image.png","image.jpg","kapak.png" -File | Select-Object -First 1
 
           if ($null -ne$imgFile) {
-            Write-Host "Yeni logo gorseli bulundu: $($imgFile.Name)"
+            Write-Host "Gorsel bulundu: $($imgFile.Name)"
             $srcBmp = [System.Drawing.Image]::FromFile($imgFile.FullName)
           } else {
+            # Yedek cözüm: Tamamen pembe/sari gradyanli şık bir arkaplan
             $srcBmp = New-Object System.Drawing.Bitmap(256, 256)
             $g = [System.Drawing.Graphics]::FromImage($srcBmp)
             $g.Clear([System.Drawing.Color]::FromArgb(255, 255, 20, 147))$g.Dispose()
@@ -49,7 +50,7 @@ jobs:
           $base64Bg = [Convert]::ToBase64String($msBg.ToArray())
           Set-Content -Path "app/src/bg_base64.txt" -Value $base64Bg -NoNewline
 
-          # 2. Windows .exe ikonu icin yeni logodan .ico uret
+          # 2. Windows .exe ikonu icin .ico uret
           $iconBmp = New-Object System.Drawing.Bitmap($srcBmp, 256, 256)$msPng = New-Object System.IO.MemoryStream
           $iconBmp.Save($msPng, [System.Drawing.Imaging.ImageFormat]::Png)
           $pngBytes =$msPng.ToArray()
@@ -67,7 +68,7 @@ jobs:
           cat << 'EOF' > app/Cargo.toml
           [package]
           name = "FurkanCELL"
-          version = "4.2.0"
+          version = "4.3.0"
           edition = "2021"
 
           [build-dependencies]
@@ -181,7 +182,7 @@ jobs:
           </head>
           <body>
             <div class="content-wrap">
-              <div class="top-bar" id="sys-bar">🌸 FurkanCELL v4.2 - Özel Ses & Canlı Müzik Sistemi</div>
+              <div class="top-bar" id="sys-bar">🌸 FurkanCELL v4.3 - Özel Ses & Canlı Müzik Sistemi</div>
 
               <div class="box" id="login-box">
                 <div class="brand-header">
@@ -584,7 +585,7 @@ jobs:
           </html>
           EOF
 
-          # Yeni yuklenen logo gorselini indirip Base64 formatina donusturen Node.js betigi
+          # Gorseli guvenli bir sekilde gommek icin dahili Node betigi
           node -e '
             const fs = require("fs");
             const https = require("https");
@@ -625,9 +626,9 @@ jobs:
                 let html = fs.readFileSync("app/src/index.html", "utf8");
                 html = html.split("__BG_BASE64__").join(base64Str);
                 fs.writeFileSync("app/src/index.html", html);
-                console.log("Yeni logo basariyla HTML e gomuldu!");
+                console.log("Gorsel basariyla HTML e gomuldu!");
               } catch (e) {
-                console.error("Gorsel isleme hatasi:", e);
+                console.error("Gorsel indirilemedi, yedek renk kullaniliyor:", e);
                 let html = fs.readFileSync("app/src/index.html", "utf8");
                 html = html.split("__BG_BASE64__").join("");
                 fs.writeFileSync("app/src/index.html", html);
