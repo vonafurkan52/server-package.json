@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ekip Ses & Müzik</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #121214; color: #e1e1e6; font-family: system-ui, -apple-system, sans-serif; padding: 20px; margin: 0; user-select: none; }
+    h2, h3 { margin-top: 0; color: #fff; }
+    .box { background: #202024; padding: 18px; border-radius: 10px; margin-bottom: 16px; border: 1px solid #29292e; }
+    .row { display: flex; gap: 8px; margin-bottom: 10px; }
+    input[type="text"] { background: #121214; color: white; border: 1px solid #323238; padding: 10px 12px; border-radius: 6px; flex: 1; font-size: 14px; outline: none; }
+    input[type="text"]:focus { border-color: #5865F2; }
+    button { background: #5865F2; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.15s; }
+    button:hover { background: #4752C4; }
+    button.mute-btn { background: #29292e; }
+    button.mute-btn.muted { background: #ed4245; }
+    .user-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #29292e; }
+    .user-row:last-child { border-bottom: none; }
+    .slider { width: 130px; accent-color: #5865F2; cursor: pointer; }
+    .badge { font-size: 12px; background: #29292e; padding: 4px 8px; border-radius: 4px; color: #a8a8b3; }
+    .status { font-size: 13px; color: #04d361; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="box" id="login-box">
+    <h2>🎧 Ekip Ses & Müzik</h2>
+    <p style="color:#a8a8b3; font-size:13px;">Oyun sesini kısmayan düşük sistem tüketimli özel oda.</p>
+    <div class="row">
+      <input type="text" id="server-url" value="http://localhost:3000" placeholder="Sunucu Adresi (Örn: https://...onrender.com)" />
+    </div>
+    <div class="row">
+      <input type="text" id="username" placeholder="Takma Adın (Örn: Furkan)" />
+      <button id="join-btn">Odaya Bağlan</button>
+    </div>
+  </div>
+
+  <div id="app-box" style="display:none;">
+    <div class="box">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="status" id="conn-status">● Ses Kanalına Bağlı (Oyun Sesi Kısılmaz)</div>
+        <button id="mute-self-btn" class="mute-btn">🎤 Mikrofon Açık</button>
+      </div>
+      <h3>Odadaki Kişiler</h3>
+      <div id="users-list">
+        <div style="color:#a8a8b3; font-size:13px;" id="empty-msg">Henüz odada başka kimse yok...</div>
+      </div>
+    </div>
+
+    <div class="box">
+      <h3>🎵 Ortak YouTube Music</h3>
+      <div class="row">
+        <input type="text" id="music-query" placeholder="Şarkı adı veya YouTube linki yaz..." />
+        <button id="play-btn">Herkeste Çal</button>
+      </div>
+      <p id="now-playing" style="font-size:13px; color:#a8a8b3;">Şu an çalan: Yok</p>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+        <span style="font-size:13px;">Müzik Sesi:</span>
+        <input type="range" id="music-vol" min="0" max="100" value="35" class="slider" />
+      </div>
+      <div id="yt-player" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="main.js"></script>
+</body>
+</html>
