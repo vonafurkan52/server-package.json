@@ -2,11 +2,14 @@ name: Masaustu Uygulamasini Derle (.exe)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
   contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-windows:
@@ -14,19 +17,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Node.js Kur
+      - name: Node.js 24 Kur
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Rust Kur
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Paketleri Yukle ve .exe Derle
+      - name: Eksik Ikonlari Otomatik Olustur ve .exe Derle
         working-directory: ./client
         run: |
           npm install
-          npx tauri build
+          mkdir -p src-tauri/icons
+          node -e "const fs=require('fs'); const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==','base64'); fs.writeFileSync('icon.png',png);"
+          npx tauri icon icon.png
+          npx tauri build --no-bundle
 
       - name: .exe Dosyasini Indirmeye Hazirla
         uses: actions/upload-artifact@v4
