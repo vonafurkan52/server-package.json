@@ -25,73 +25,240 @@ jobs:
       - name: Rust Kur
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Dosyalari Hatasiz Hazirla (Node.js)
+      - name: Tum Uygulamayi Tek Parca Hazirla
         shell: bash
         run: |
           node -e '
           const fs = require("fs");
-          fs.mkdirSync("client/src", { recursive: true });
-          fs.mkdirSync("client/src-tauri/src", { recursive: true });
-          fs.mkdirSync("client/src-tauri/icons", { recursive: true });
+          fs.mkdirSync("app/src", { recursive: true });
 
-          if (fs.existsSync("index.html")) fs.copyFileSync("index.html", "client/src/index.html");
-          if (fs.existsSync("main.js")) fs.copyFileSync("main.js", "client/src/main.js");
-          if (!fs.existsSync("client/src/index.html")) {
-            fs.writeFileSync("client/src/index.html", "<!DOCTYPE html><html><body style=\"background:#121214;color:#fff;font-family:sans-serif;padding:20px;\"><h2>Ekip Ses & Muzik Hazir</h2></body></html>");
-          }
-
-          fs.writeFileSync("client/package.json", JSON.stringify({
-            name: "ekip-ses",
-            version: "1.0.0",
-            dependencies: { "@tauri-apps/cli": "1.5.14" }
-          }, null, 2));
-
-          fs.writeFileSync("client/src-tauri/Cargo.toml", `[package]
+          // build.rs ve ikon zorunlulugu OLMAYAN saf Rust WebView yapilandirmasi
+          fs.writeFileSync("app/Cargo.toml", `[package]
           name = "ekip-ses"
           version = "1.0.0"
           edition = "2021"
 
-          [build-dependencies]
-          tauri-build = { version = "1.5", features = [] }
-
           [dependencies]
-          tauri = { version = "1.5", features = ["shell-open"] }
-          serde = { version = "1.0", features = ["derive"] }
-          serde_json = "1.0"
-
-          [features]
-          custom-protocol = ["tauri/custom-protocol"]
+          tao = "0.26"
+          wry = "0.37"
           `);
 
-          fs.writeFileSync("client/src-tauri/build.rs", "fn main() { tauri_build::build() }");
-          fs.writeFileSync("client/src-tauri/src/main.rs", "#![cfg_attr(not(debug_assertions), windows_subsystem = \"windows\")]\nfn main() { tauri::Builder::default().run(tauri::generate_context!()).expect(\"error\"); }");
+          const html = `<!DOCTYPE html>
+          <html lang="tr">
+          <head>
+            <meta charset="UTF-8" />
+            <title>Ekip Ses & Müzik</title>
+            <style>
+              * { box-sizing: border-box; }
+              body { background: #121214; color: #e1e1e6; font-family: system-ui, sans-serif; padding: 20px; margin: 0; user-select: none; }
+              h2, h3 { margin-top: 0; color: #fff; }
+              .box { background: #202024; padding: 18px; border-radius: 10px; margin-bottom: 16px; border: 1px solid #29292e; }
+              .row { display: flex; gap: 8px; margin-bottom: 10px; }
+              input[type="text"] { background: #121214; color: white; border: 1px solid #323238; padding: 10px 12px; border-radius: 6px; flex: 1; font-size: 14px; outline: none; }
+              button { background: #5865F2; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; }
+              button:hover { background: #4752C4; }
+              button.mute-btn { background: #29292e; }
+              button.mute-btn.muted { background: #ed4245; }
+              .user-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #29292e; }
+              .slider { width: 130px; accent-color: #5865F2; cursor: pointer; }
+              .badge { font-size: 12px; background: #29292e; padding: 4px 8px; border-radius: 4px; color: #a8a8b3; }
+              .status { font-size: 13px; color: #04d361; margin-bottom: 12px; }
+            </style>
+          </head>
+          <body>
+            <div class="box" id="login-box">
+              <h2>🎧 Ekip Ses & Müzik</h2>
+              <p style="color:#a8a8b3; font-size:13px;">Oyun sesini kısmayan düşük sistem tüketimli özel oda.</p>
+              <div class="row">
+                <input type="text" id="server-url" value="http://localhost:3000" placeholder="Sunucu Adresi" />
+              </div>
+              <div class="row">
+                <input type="text" id="username" placeholder="Takma Adın (Örn: Furkan)" />
+                <button id="join-btn">Odaya Bağlan</button>
+              </div>
+            </div>
 
-          fs.writeFileSync("client/src-tauri/tauri.conf.json", JSON.stringify({
-            build: { devPath: "../src", distDir: "../src", withGlobalTauri: true },
-            package: { productName: "EkipSes", version: "1.0.0" },
-            tauri: {
-              allowlist: { all: false },
-              bundle: { active: false, identifier: "com.ekipses.app", icon: ["icons/icon.ico"] },
-              security: { csp: null },
-              windows: [{ title: "Ekip Ses & Muzik", width: 480, height: 600 }]
-            }
-          }, null, 2));
+            <div id="app-box" style="display:none;">
+              <div class="box">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <div class="status">● Ses Kanalına Bağlı (Oyun Sesi Kısılmaz)</div>
+                  <button id="mute-self-btn" class="mute-btn">🎤 Mikrofon Açık</button>
+                </div>
+                <h3>Odadaki Kişiler</h3>
+                <div id="users-list">
+                  <div style="color:#a8a8b3; font-size:13px;" id="empty-msg">Henüz odada başka kimse yok...</div>
+                </div>
+              </div>
 
-          // Gecerli 1x1 PNG dosyasini dogrudan olustur
-          const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
-          fs.writeFileSync("client/src-tauri/icons/icon.png", png);
+              <div class="box">
+                <h3>🎵 Ortak YouTube Music</h3>
+                <div class="row">
+                  <input type="text" id="music-query" placeholder="Şarkı adı veya YouTube linki yaz..." />
+                  <button id="play-btn">Herkeste Çal</button>
+                </div>
+                <p id="now-playing" style="font-size:13px; color:#a8a8b3;">Şu an çalan: Yok</p>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+                  <span style="font-size:13px;">Müzik Sesi:</span>
+                  <input type="range" id="music-vol" min="0" max="100" value="35" class="slider" />
+                </div>
+                <div id="yt-player" style="display:none;"></div>
+              </div>
+            </div>
 
-          // Gecerli Windows ICO basligini (22 byte) + PNG verisini birlestirerek hatasiz icon.ico uret
-          const icoHeader = Buffer.from([0,0, 1,0, 1,0, 1,1, 0, 0, 1,0, 32,0, png.length,0,0,0, 22,0,0,0]);
-          fs.writeFileSync("client/src-tauri/icons/icon.ico", Buffer.concat([icoHeader, png]));
+            <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+            <script src="https://www.youtube.com/iframe_api"></script>
+            <script>
+              const ROOM_ID = "oyun-odasi-1";
+              let socket, localStream, isMuted = false, audioCtx, ytPlayer;
+              const peers = {};
+
+              function onYouTubeIframeAPIReady() {
+                ytPlayer = new YT.Player("yt-player", { height: "0", width: "0", playerVars: { autoplay: 1, controls: 0 } });
+              }
+
+              document.getElementById("join-btn").addEventListener("click", async () => {
+                const username = document.getElementById("username").value.trim() || "Oyuncu";
+                const serverUrl = document.getElementById("server-url").value.trim() || "http://localhost:3000";
+                try {
+                  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                  localStream = await navigator.mediaDevices.getUserMedia({
+                    video: false,
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false }
+                  });
+                } catch (err) {
+                  alert("Mikrofon izni alınamadı: " + err.message);
+                  return;
+                }
+                document.getElementById("login-box").style.display = "none";
+                document.getElementById("app-box").style.display = "block";
+                socket = io(serverUrl);
+                socket.emit("join-room", ROOM_ID, username);
+                socket.on("existing-users", (users) => users.forEach(u => createPeer(u.id, u.username, true)));
+                socket.on("user-connected", (u) => createPeer(u.id, u.username, false));
+                socket.on("signal", async ({ from, username: rName, signal }) => {
+                  if (!peers[from]) createPeer(from, rName, false);
+                  const pc = peers[from];
+                  if (signal.sdp) {
+                    await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                    if (signal.sdp.type === "offer") {
+                      const answer = await pc.createAnswer();
+                      await pc.setLocalDescription(answer);
+                      socket.emit("signal", { to: from, signal: { sdp: pc.localDescription } });
+                    }
+                  } else if (signal.candidate) {
+                    await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                  }
+                });
+                socket.on("sync-music", ({ videoId, title }) => {
+                  document.getElementById("now-playing").innerText = "Şu an çalan: " + title;
+                  if (ytPlayer && ytPlayer.loadVideoById) {
+                    ytPlayer.loadVideoById(videoId);
+                    ytPlayer.setVolume(document.getElementById("music-vol").value);
+                  }
+                });
+                socket.on("user-disconnected", (id) => {
+                  if (peers[id]) peers[id].close();
+                  delete peers[id];
+                  const el = document.getElementById("user-" + id);
+                  if (el) el.remove();
+                });
+              });
+
+              document.getElementById("mute-self-btn").addEventListener("click", (e) => {
+                if (!localStream) return;
+                isMuted = !isMuted;
+                localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+                e.target.innerText = isMuted ? "🔇 Mikrofon Kapalı" : "🎤 Mikrofon Açık";
+                e.target.classList.toggle("muted", isMuted);
+              });
+
+              function createPeer(targetId, targetName, isOffer) {
+                const emptyMsg = document.getElementById("empty-msg");
+                if (emptyMsg) emptyMsg.style.display = "none";
+                const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+                peers[targetId] = pc;
+                localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+                pc.onicecandidate = (e) => { if (e.candidate) socket.emit("signal", { to: targetId, signal: { candidate: e.candidate } }); };
+                pc.ontrack = (e) => {
+                  const source = audioCtx.createMediaStreamSource(e.streams[0]);
+                  const gainNode = audioCtx.createGain();
+                  source.connect(gainNode);
+                  gainNode.connect(audioCtx.destination);
+                  const audio = new Audio();
+                  audio.srcObject = e.streams[0];
+                  audio.muted = true;
+                  audio.play();
+                  if (!document.getElementById("user-" + targetId)) {
+                    const row = document.createElement("div");
+                    row.className = "user-row";
+                    row.id = "user-" + targetId;
+                    row.innerHTML = "<span>🎙️ " + targetName + "</span><div style=\"display:flex;align-items:center;gap:8px;\"><span class=\"badge\" id=\"vol-" + targetId + "\">100%</span><input type=\"range\" min=\"0\" max=\"2\" step=\"0.05\" value=\"1\" class=\"slider\" /></div>";
+                    row.querySelector("input").addEventListener("input", (ev) => {
+                      const val = parseFloat(ev.target.value);
+                      gainNode.gain.value = val;
+                      document.getElementById("vol-" + targetId).innerText = Math.round(val * 100) + "%";
+                    });
+                    document.getElementById("users-list").appendChild(row);
+                  }
+                };
+                if (isOffer) {
+                  pc.onnegotiationneeded = async () => {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    socket.emit("signal", { to: targetId, signal: { sdp: pc.localDescription } });
+                  };
+                }
+              }
+
+              document.getElementById("play-btn").addEventListener("click", () => {
+                const q = document.getElementById("music-query").value.trim();
+                if (q && socket) socket.emit("play-music", q);
+              });
+              document.getElementById("music-vol").addEventListener("input", (e) => {
+                if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(e.target.value);
+              });
+            <\/script>
+          </body>
+          </html>`;
+
+          fs.writeFileSync("app/src/index.html", html);
+
+          fs.writeFileSync("app/src/main.rs", `#![windows_subsystem = "windows"]
+          use tao::{
+            event::{Event, WindowEvent},
+            event_loop::{ControlFlow, EventLoop},
+            window::WindowBuilder,
+          };
+          use wry::WebViewBuilder;
+
+          fn main() -> wry::Result<()> {
+            let event_loop = EventLoop::new();
+            let window = WindowBuilder::new()
+              .with_title("Ekip Ses & Müzik")
+              .with_inner_size(tao::dpi::LogicalSize::new(480.0, 620.0))
+              .build(&event_loop)
+              .unwrap();
+
+            let _webview = WebViewBuilder::new(&window)
+              .with_html(include_str!("index.html"))
+              .build()?;
+
+            event_loop.run(move |event, _, control_flow| {
+              *control_flow = ControlFlow::Wait;
+              if let Event::WindowEvent { event: WindowEvent::CloseRequested, .. } = event {
+                *control_flow = ControlFlow::Exit;
+              }
+            });
+          }
+          `);
           '
 
       - name: .exe Derle
-        working-directory: ./client/src-tauri
+        working-directory: ./app
         run: cargo build --release
 
       - name: .exe Dosyasini Indirmeye Hazirla
         uses: actions/upload-artifact@v4
         with:
           name: EkipSes-Windows-Exe
-          path: ./client/src-tauri/target/release/ekip-ses.exe
+          path: ./app/target/release/ekip-ses.exe
