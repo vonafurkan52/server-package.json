@@ -109,7 +109,7 @@ jobs:
             <script src="https://www.youtube.com/iframe_api"></script>
             <script>
               let localStream, audioCtx, ytPlayer, isMuted = false;
-              let myPeer, hostPeer, isHost = false;
+              let myPeer, isHost = false;
               let myName = "Oyuncu";
               const connections = {};
               const mediaCalls = {};
@@ -118,7 +118,7 @@ jobs:
               function onYouTubeIframeAPIReady() {
                 ytPlayer = new YT.Player("yt-player", {
                   height: "1", width: "1",
-                  playerVars: { autoplay: 1, controls: 0, origin: "https://ekip.local" }
+                  playerVars: { autoplay: 1, controls: 0 }
                 });
               }
 
@@ -138,7 +138,7 @@ jobs:
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false }
                   });
                 } catch (err) {
-                  log.innerText = "Mikrofon bulunamadı, salt dinleyici olarak bağlanılıyor...";
+                  log.innerText = "Mikrofon izni alınamadı veya mikrofon yok, dinleyici modunda giriliyor...";
                   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                   const dest = audioCtx.createMediaStreamDestination();
                   localStream = dest.stream;
@@ -150,10 +150,9 @@ jobs:
 
               function initRoom(roomName) {
                 const hostId = "ekipses-room-" + roomName;
-                // Önce odayı kuran (Host) olmayı dene
                 const tempPeer = new Peer(hostId);
 
-                tempPeer.on("open", (id) => {
+                tempPeer.on("open", () => {
                   isHost = true;
                   myPeer = tempPeer;
                   enterAppUI(roomName, true);
@@ -162,10 +161,9 @@ jobs:
 
                 tempPeer.on("error", (err) => {
                   if (err.type === "unavailable-id") {
-                    // Oda zaten kurulmuş, normal katılımcı olarak bağlan
                     isHost = false;
                     myPeer = new Peer();
-                    myPeer.on("open", (myId) => {
+                    myPeer.on("open", () => {
                       enterAppUI(roomName, false);
                       connectToHost(hostId);
                     });
@@ -192,7 +190,7 @@ jobs:
                 const list = document.getElementById("users-list");
                 const row = document.createElement("div");
                 row.className = "user-row";
-                row.innerHTML = "<span>🟢 " + myName + " (Sen)</span><span class='badge'>Mikrofon Aktif</span>";
+                row.innerHTML = "<span>🟢 " + myName + " (Sen)</span><span class='badge'>Aktif</span>";
                 list.appendChild(row);
               }
 
@@ -202,10 +200,8 @@ jobs:
                     if (data.type === "join") {
                       peerNames[conn.peer] = data.name;
                       connections[conn.peer] = conn;
-                      // Yeni gelene mevcut üyeleri gönder
                       const existing = Object.keys(connections).filter(k => k !== conn.peer).map(k => ({ id: k, name: peerNames[k] }));
                       conn.send({ type: "peer-list", peers: existing, hostName: myName });
-                      // Host olarak yeni geleni sesli ara
                       callPeer(conn.peer, data.name);
                     } else if (data.type === "music") {
                       playVideo(data.videoId, data.title);
@@ -294,7 +290,6 @@ jobs:
                 e.target.classList.toggle("muted", isMuted);
               });
 
-              // Sunucusuz YouTube Arama & Link Çözücü
               async function resolveYouTube(query) {
                 const reg = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
                 const match = query.match(reg);
@@ -348,7 +343,6 @@ jobs:
 
           fs.writeFileSync("app/src/index.html", html);
 
-          // HTTPS sanal protokolü sayesinde WebView2 mikrofon iznini ve YouTube API'yi engellemez
           fs.writeFileSync("app/src/main.rs", `#![windows_subsystem = "windows"]
           use std::borrow::Cow;
           use tao::{
@@ -376,7 +370,7 @@ jobs:
                   .body(Cow::Borrowed(html_bytes.as_slice()))
                   .unwrap()
               })
-              .with_url("https://ekip.local/index.html")?
+              .with_url("ekip://localhost")
               .build()?;
 
             event_loop.run(move |event, _, control_flow| {
