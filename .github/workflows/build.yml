@@ -1,0 +1,35 @@
+name: Masaustu Uygulamasini Derle (.exe)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js Kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rust Kur
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Paketleri Yukle ve .exe Derle
+        working-directory: ./client
+        run: |
+          npm install
+          npx tauri build
+
+      - name: .exe Dosyasini Indirmeye Hazirla
+        uses: actions/upload-artifact@v4
+        with:
+          name: EkipSes-Windows-Exe
+          path: ./client/src-tauri/target/release/ekip-ses.exe
