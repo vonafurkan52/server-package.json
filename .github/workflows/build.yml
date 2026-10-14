@@ -1,4 +1,4 @@
-name: Masaustu Uygulamasini Derle (.exe)
+name: FurkanCELL Masaustu Derleyici (.exe)
 
 on:
   push:
@@ -17,24 +17,86 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Node.js Kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Rust Kur
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Dosyalari Dogrudan Olustur
+      - name: Kapak Fotografini Ikona (.ico) ve Arka Plana Donustur
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "app/src"
+          Add-Type -AssemblyName System.Drawing
+
+          # Kullanicinin yukledigi kapak fotografini bul (kapak.png, kapak.jpg, image.png vb.)
+          $imgFile = Get-ChildItem -Path "." -Include "kapak.png","kapak.jpg","kapak.jpeg","image.png","image.jpg" -File | Select-Object -First 1
+
+          if ($null -ne $imgFile) {
+            Write-Host "Kapak fotografi bulundu: $($imgFile.Name)"
+            $srcBmp = [System.Drawing.Image]::FromFile($imgFile.FullName)
+          } else {
+            Write-Host "Kapak fotografi bulunamadi, varsayilan pembe ikon olusturuluyor..."
+            $srcBmp = New-Object System.Drawing.Bitmap(256, 256)
+            $g = [System.Drawing.Graphics]::FromImage($srcBmp)
+            $g.Clear([System.Drawing.Color]::FromArgb(255, 255, 42, 133))
+            $g.Dispose()
+          }
+
+          # 1. Arka plan icin Base64 metnine cevir
+          $msBg = New-Object System.IO.MemoryStream
+          $srcBmp.Save($msBg, [System.Drawing.Imaging.ImageFormat]::Jpeg)
+          $base64Bg = [Convert]::ToBase64String($msBg.ToArray())
+          Set-Content -Path "app/src/bg_base64.txt" -Value $base64Bg -NoNewline
+
+          # 2. Uygulama ikonu icin 256x256 kare PNG ve Windows .ico olustur
+          $iconBmp = New-Object System.Drawing.Bitmap($srcBmp, 256, 256)
+          $msPng = New-Object System.IO.MemoryStream
+          $iconBmp.Save($msPng, [System.Drawing.Imaging.ImageFormat]::Png)
+          $pngBytes = $msPng.ToArray()
+          [System.IO.File]::WriteAllBytes("app/src/icon_raw.bin", $pngBytes)
+
+          # Windows .exe dosya ikonu icin gecerli .ico dosyasi uret
+          $fsIco = [System.IO.File]::Create("app/icon.ico")
+          $bw = New-Object System.IO.BinaryWriter($fsIco)
+          $bw.Write([Int16]0); $bw.Write([Int16]1); $bw.Write([Int16]1)
+          $bw.Write([Byte]0); $bw.Write([Byte]0); $bw.Write([Byte]0); $bw.Write([Byte]0)
+          $bw.Write([Int16]1); $bw.Write([Int16]32)
+          $bw.Write([Int32]$pngBytes.Length)
+          $bw.Write([Int32]22)
+          $bw.Write($pngBytes)
+          $bw.Close()
+          $srcBmp.Dispose()
+
+      - name: FurkanCELL Uygulama Kodlarini Olustur
         shell: bash
         run: |
-          mkdir -p app/src
-
           cat << 'EOF' > app/Cargo.toml
           [package]
-          name = "ekip-ses-v3"
-          version = "3.0.0"
+          name = "FurkanCELL"
+          version = "4.0.0"
           edition = "2021"
+
+          [build-dependencies]
+          winres = "0.1"
 
           [dependencies]
           tao = "0.26"
           wry = "0.37"
           tiny_http = "0.12"
+          image = "0.24"
+          EOF
+
+          cat << 'EOF' > app/build.rs
+          fn main() {
+            if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "windows" {
+              let mut res = winres::WindowsResource::new();
+              res.set_icon("icon.ico");
+              let _ = res.compile();
+            }
+          }
           EOF
 
           cat << 'EOF' > app/src/index.html
@@ -42,95 +104,190 @@ jobs:
           <html lang="tr">
           <head>
             <meta charset="UTF-8" />
-            <title>Ekip Ses v3.0</title>
+            <title>FurkanCELL</title>
             <style>
               * { box-sizing: border-box; }
-              body { background: #121214; color: #e1e1e6; font-family: system-ui, sans-serif; padding: 16px; margin: 0; }
-              h2, h3 { margin-top: 0; color: #fff; }
-              .top-bar { background: #04d361; color: #000; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 12px; margin-bottom: 12px; text-align: center; }
-              .box { background: #202024; padding: 16px; border-radius: 10px; margin-bottom: 14px; border: 1px solid #29292e; }
-              .row { display: flex; gap: 8px; margin-bottom: 10px; }
-              input[type="text"] { background: #121214; color: white; border: 1px solid #323238; padding: 10px 12px; border-radius: 6px; flex: 1; font-size: 14px; }
-              button { background: #5865F2; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
-              button:active { transform: scale(0.97); }
-              button.mute-btn { background: #29292e; }
-              button.mute-btn.muted { background: #ed4245; }
-              .user-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #29292e; }
-              .slider { width: 110px; accent-color: #5865F2; cursor: pointer; }
-              .badge { font-size: 12px; background: #29292e; padding: 4px 8px; border-radius: 4px; color: #a8a8b3; }
-              .status { font-size: 13px; color: #04d361; font-weight: 600; }
+              body {
+                background-color: #1a0510;
+                color: #ffe6f2;
+                font-family: 'Segoe UI', system-ui, sans-serif;
+                padding: 16px;
+                margin: 0;
+                position: relative;
+                min-height: 100vh;
+                overflow-x: hidden;
+              }
+              /* Arka plan saydam kapak fotografi (Filigran) */
+              body::before {
+                content: "";
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background-image: url("data:image/jpeg;base64,__BG_BASE64__");
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                opacity: 0.14;
+                pointer-events: none;
+                z-index: 0;
+              }
+              .content-wrap { position: relative; z-index: 1; }
+              h2, h3 { margin-top: 0; color: #ff85c0; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+              .top-bar {
+                background: linear-gradient(90deg, #ff1493, #ff69b4);
+                color: #fff;
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 13px;
+                margin-bottom: 14px;
+                text-align: center;
+                box-shadow: 0 4px 12px rgba(255, 20, 147, 0.35);
+              }
+              .box {
+                background: rgba(43, 9, 26, 0.84);
+                backdrop-filter: blur(8px);
+                padding: 16px;
+                border-radius: 12px;
+                margin-bottom: 14px;
+                border: 1px solid #ff2a85;
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+              }
+              .row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+              input[type="text"] {
+                background: rgba(20, 3, 12, 0.9);
+                color: #fff;
+                border: 1px solid #b81d62;
+                padding: 10px 12px;
+                border-radius: 8px;
+                flex: 1;
+                font-size: 14px;
+                outline: none;
+              }
+              input[type="text"]:focus { border-color: #ff69b4; box-shadow: 0 0 8px rgba(255,105,180,0.4); }
+              button {
+                background: linear-gradient(135deg, #ff1493, #d6006e);
+                color: white;
+                border: none;
+                padding: 10px 15px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: bold;
+                font-size: 13px;
+                transition: 0.15s;
+                box-shadow: 0 3px 10px rgba(255, 20, 147, 0.3);
+              }
+              button:hover { filter: brightness(1.15); }
+              button:active { transform: scale(0.96); }
+              button.secondary-btn { background: #4a122f; border: 1px solid #ff2a85; }
+              button.mute-btn { background: #4a122f; border: 1px solid #ff69b4; }
+              button.mute-btn.muted { background: #e60026; border-color: #ff4d4d; }
+              .user-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255, 42, 133, 0.25); }
+              .slider { width: 110px; accent-color: #ff1493; cursor: pointer; }
+              .badge { font-size: 11px; background: #590d32; padding: 4px 8px; border-radius: 6px; color: #ffb3d9; border: 1px solid #ff2a85; }
+              .status { font-size: 13px; color: #ff85c0; font-weight: bold; }
+              .brand-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+              .brand-header img { width: 48px; height: 48px; border-radius: 50%; border: 2px solid #ff1493; object-fit: cover; }
             </style>
           </head>
           <body>
-            <div class="top-bar" id="sys-bar">✅ SÜRÜM 3.0 AKTİF - SİSTEM HAZIR</div>
+            <div class="content-wrap">
+              <div class="top-bar" id="sys-bar">🌸 FurkanCELL v4.0 - Özel Ses & Canlı Müzik Sistemi</div>
 
-            <div class="box" id="login-box">
-              <h2>🎧 Ekip Ses & Müzik v3</h2>
-              <div class="row">
-                <input type="text" id="room-input" value="ekip-oda-1" placeholder="Oda Adı" />
-              </div>
-              <div class="row">
-                <input type="text" id="username" value="Furkan" placeholder="Takma Adın" />
-                <button type="button" id="join-btn" onclick="baglan()">Odaya Bağlan</button>
-              </div>
-            </div>
-
-            <div id="app-box" style="display:none;">
-              <div class="box">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                  <div class="status" id="room-title">● Odaya Girildi</div>
-                  <button type="button" id="mute-self-btn" class="mute-btn" onclick="mikrofonAcKapat()">🎤 Mikrofon Açık</button>
+              <div class="box" id="login-box">
+                <div class="brand-header">
+                  <img src="data:image/jpeg;base64,__BG_BASE64__" alt="FurkanCELL" />
+                  <div>
+                    <h2 style="margin:0;">FurkanCELL</h2>
+                    <span style="font-size:12px; color:#ffb3d9;">Oyun Sesini Kısmayan Özel Pembe Oda</span>
+                  </div>
                 </div>
-                <h3>Odadaki Kişiler</h3>
-                <div id="users-list"></div>
-              </div>
-
-              <div class="box">
-                <h3>🎵 Ortak YouTube Music</h3>
                 <div class="row">
-                  <input type="text" id="music-query" placeholder="YouTube linki veya şarkı adı yaz..." />
-                  <button type="button" onclick="muzikCal()">Herkeste Çal</button>
+                  <input type="text" id="room-input" value="furkancell-1" placeholder="Oda Adı" />
                 </div>
-                <p id="now-playing" style="font-size:13px; color:#04d361; margin: 6px 0;">Şu an çalan: Yok</p>
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px;">
-                  <span style="font-size:13px;">Müzik Sesi:</span>
-                  <input type="range" id="music-vol" min="0" max="100" value="40" class="slider" oninput="sesAyarla(this.value)" />
+                <div class="row">
+                  <input type="text" id="username" value="Furkan" placeholder="Takma Adın" />
+                  <button type="button" onclick="baglan()">Odaya Giriş Yap</button>
                 </div>
-                <div id="yt-wrap" style="margin-top:10px; border-radius:8px; overflow:hidden; height:90px; background:#000;">
-                  <div id="yt-player"></div>
+              </div>
+
+              <div id="app-box" style="display:none;">
+                <div class="box">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div class="status" id="room-title">● FurkanCELL Odası</div>
+                    <button type="button" id="mute-self-btn" class="mute-btn" onclick="mikrofonAcKapat()">🎤 Mikrofon Açık</button>
+                  </div>
+                  <h3>Odadaki Kişiler</h3>
+                  <div id="users-list"></div>
+                </div>
+
+                <div class="box">
+                  <h3>🎵 FurkanCELL Kesintisiz & Senkronize Müzik</h3>
+                  <p style="font-size:12px; color:#ffb3d9; margin-top:0;">
+                    Kendi YouTube Music hesabını açıp canlı yayınlayabilir veya kesintisiz radyo başlatabilirsin. Sen durdurunca herkeste durur!
+                  </p>
+
+                  <!-- Yöntem 1: Doğrudan Kendi YouTube Music Hesabından Canlı Ses Yayını -->
+                  <div class="row">
+                    <button type="button" style="width:100%; background:linear-gradient(90deg,#ff0055,#ff1493);" onclick="ytMusicHesabimiYayinla()">
+                      🎧 Kendi YouTube Music Hesabımı Aç & Odadakilere Canlı Dinlet
+                    </button>
+                  </div>
+
+                  <hr style="border:0; border-top:1px solid rgba(255,42,133,0.3); margin: 12px 0;" />
+
+                  <!-- Yöntem 2: Tam Senkronize Ortak Çalar & Otomatik Radyo -->
+                  <div class="row">
+                    <input type="text" id="music-query" placeholder="Şarkı adı, Playlist veya Radyo yaz (Örn: Türkçe Pop Mix)..." />
+                    <button type="button" onclick="muzikCal()">Kesintisiz Başlat</button>
+                  </div>
+
+                  <div class="row" style="justify-content: space-between;">
+                    <button type="button" class="secondary-btn" onclick="ortakDurdurBaslat()" id="play-pause-btn">⏯️ Herkeste Durdur / Başlat</button>
+                    <button type="button" class="secondary-btn" onclick="siradakiSarki()">⏭️ Sıradaki Şarkıya Geç</button>
+                  </div>
+
+                  <p id="now-playing" style="font-size:13px; color:#ff85c0; font-weight:bold; margin: 6px 0;">Şu an çalan: Yok</p>
+
+                  <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px;">
+                    <span style="font-size:13px;">Müzik Sesi:</span>
+                    <input type="range" id="music-vol" min="0" max="100" value="45" class="slider" oninput="sesAyarla(this.value)" />
+                  </div>
+
+                  <div id="yt-wrap" style="margin-top:10px; border-radius:8px; overflow:hidden; height:110px; background:#000; border:1px solid #ff2a85;">
+                    <div id="yt-player"></div>
+                  </div>
                 </div>
               </div>
             </div>
 
             <script>
               let localStream = null;
+              let musicStream = null;
               let audioCtx = null;
               let ytPlayer = null;
               let isMuted = false;
               let myPeer = null;
               let isHost = false;
               let myName = "Furkan";
+              let ignoreStateChange = false;
+              let radioQueue = [];
+              let currentQueueIndex = 0;
               const connections = {};
               const peerNames = {};
 
-              // 1. Butona basildigi an HICBIR kutuphaneyi beklemeden ekrani degistir!
               function baglan() {
-                try {
-                  myName = document.getElementById("username").value.trim() || "Oyuncu";
-                  const rawRoom = document.getElementById("room-input").value.trim().toLowerCase();
-                  const roomName = rawRoom.replace(/[^a-z0-9-]/g, "") || "ekip-oda-1";
+                myName = document.getElementById("username").value.trim() || "Oyuncu";
+                const rawRoom = document.getElementById("room-input").value.trim().toLowerCase();
+                const roomName = rawRoom.replace(/[^a-z0-9-]/g, "") || "furkancell-1";
 
-                  document.getElementById("login-box").style.display = "none";
-                  document.getElementById("app-box").style.display = "block";
-                  document.getElementById("sys-bar").innerText = "🟢 ODAYA GİRİŞ YAPILDI: " + roomName.toUpperCase();
+                document.getElementById("login-box").style.display = "none";
+                document.getElementById("app-box").style.display = "block";
+                document.getElementById("sys-bar").innerText = "🌸 FurkanCELL Aktif Oda: " + roomName.toUpperCase();
 
-                  const list = document.getElementById("users-list");
-                  list.innerHTML = '<div class="user-row"><span>🟢 ' + myName + ' (Sen)</span><span class="badge" id="my-mic-badge">Mikrofon Açılıyor...</span></div>';
+                const list = document.getElementById("users-list");
+                list.innerHTML = '<div class="user-row"><span>🌸 ' + myName + ' (Sen)</span><span class="badge" id="my-mic-badge">Hazırlanıyor...</span></div>';
 
-                  mikrofonuHazirla(roomName);
-                } catch (e) {
-                  document.getElementById("sys-bar").innerText = "Hata: " + e.message;
-                }
+                mikrofonuHazirla(roomName);
               }
 
               async function mikrofonuHazirla(roomName) {
@@ -147,24 +304,40 @@ jobs:
                   localStream = dest.stream;
                   document.getElementById("my-mic-badge").innerText = "Dinleyici Modu";
                 }
-
                 peerBaglantisiniKur(roomName);
+              }
+
+              // Kendi YouTube Music Hesabini Acip Dogrudan Odaya Canli Ses Yayinlama
+              async function ytMusicHesabimiYayinla() {
+                window.open("https://music.youtube.com", "_blank", "width=950,height=700");
+                try {
+                  // Kullanici acilan YouTube Music penceresinin sesini paylasir
+                  musicStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+                  });
+                  document.getElementById("now-playing").innerText = "🔴 Kendi YouTube Music Hesabın Canlı Yayınlanıyor!";
+                  // Odadaki herkese bu canli muzik akisini gonder
+                  Object.keys(connections).forEach(function(peerId) {
+                    myPeer.call(peerId, musicStream, { metadata: { name: "🎵 FurkanCELL Canlı DJ", isMusic: true } });
+                  });
+                } catch (err) {
+                  document.getElementById("now-playing").innerText = "ℹ️ YouTube Music açıldı. Sesi paylaşmak için pencereyi seçip 'Ses paylaş' kutusunu işaretleyin.";
+                }
               }
 
               function peerBaglantisiniKur(roomName) {
                 if (typeof Peer === "undefined") {
-                  document.getElementById("room-title").innerText = "⚠️ Ses sunucusu yükleniyor, lütfen 2 sn bekleyin...";
-                  setTimeout(function() { peerBaglantisiniKur(roomName); }, 1500);
+                  setTimeout(function() { peerBaglantisiniKur(roomName); }, 1000);
                   return;
                 }
-
-                const hostId = "ekipses-v3-room-" + roomName;
+                const hostId = "furkancell-v4-" + roomName;
                 const tempPeer = new Peer(hostId);
 
                 tempPeer.on("open", function() {
                   isHost = true;
                   myPeer = tempPeer;
-                  document.getElementById("room-title").innerText = "● Oda: " + roomName + " (Kurucu - Online)";
+                  document.getElementById("room-title").innerText = "● Oda: " + roomName + " (Kurucu)";
                   ortakPeerAyarlari();
                   hostDinleyicileri();
                 });
@@ -174,12 +347,10 @@ jobs:
                     isHost = false;
                     myPeer = new Peer();
                     myPeer.on("open", function() {
-                      document.getElementById("room-title").innerText = "● Oda: " + roomName + " (Üye - Online)";
+                      document.getElementById("room-title").innerText = "● Oda: " + roomName + " (Bağlı)";
                       ortakPeerAyarlari();
                       hostaBaglan(hostId);
                     });
-                  } else {
-                    document.getElementById("room-title").innerText = "● Durum: " + err.type;
                   }
                 });
               }
@@ -187,22 +358,20 @@ jobs:
               function ortakPeerAyarlari() {
                 myPeer.on("call", function(call) {
                   call.answer(localStream);
-                  aramayiYonet(call, call.metadata ? call.metadata.name : "Arkadaş");
+                  const label = (call.metadata && call.metadata.name) ? call.metadata.name : "Arkadaş";
+                  aramayiYonet(call, label);
                 });
               }
 
               function hostDinleyicileri() {
                 myPeer.on("connection", function(conn) {
                   conn.on("data", function(data) {
-                    if (data.type === "join") {
-                      peerNames[conn.peer] = data.name;
-                      connections[conn.peer] = conn;
-                      const existing = Object.keys(connections).filter(function(k) { return k !== conn.peer; }).map(function(k) { return { id: k, name: peerNames[k] }; });
-                      conn.send({ type: "peer-list", peers: existing, hostName: myName });
-                      kisiyiAra(conn.peer, data.name);
-                    } else if (data.type === "music") {
-                      videoyuOynat(data.videoId, data.title);
-                      herkeseGonder(data);
+                    veriIsle(conn, data);
+                    // Host gelen muzik/kontrol komutunu diger herkese de iletir
+                    if (data.type && data.type.startsWith("music-")) {
+                      Object.values(connections).forEach(function(c) {
+                        if (c.peer !== conn.peer && c.open) c.send(data);
+                      });
                     }
                   });
                   conn.on("close", function() { kullaniciSil(conn.peer); });
@@ -216,16 +385,45 @@ jobs:
                   conn.send({ type: "join", name: myName });
                 });
                 conn.on("data", function(data) {
-                  if (data.type === "peer-list") {
-                    peerNames[hostId] = data.hostName;
-                    data.peers.forEach(function(p) {
-                      peerNames[p.id] = p.name;
-                      kisiyiAra(p.id, p.name);
-                    });
-                  } else if (data.type === "music") {
-                    videoyuOynat(data.videoId, data.title);
-                  }
+                  veriIsle(conn, data);
                 });
+              }
+
+              function veriIsle(conn, data) {
+                if (data.type === "join") {
+                  peerNames[conn.peer] = data.name;
+                  connections[conn.peer] = conn;
+                  const existing = Object.keys(connections).filter(function(k) { return k !== conn.peer; }).map(function(k) { return { id: k, name: peerNames[k] }; });
+                  conn.send({ type: "peer-list", peers: existing, hostName: myName });
+                  kisiyiAra(conn.peer, data.name);
+                  if (musicStream) {
+                    myPeer.call(conn.peer, musicStream, { metadata: { name: "🎵 FurkanCELL Canlı DJ", isMusic: true } });
+                  }
+                } else if (data.type === "peer-list") {
+                  peerNames[conn.peer] = data.hostName;
+                  data.peers.forEach(function(p) {
+                    peerNames[p.id] = p.name;
+                    kisiyiAra(p.id, p.name);
+                  });
+                } else if (data.type === "music-load") {
+                  radioQueue = data.queue || [];
+                  currentQueueIndex = data.index || 0;
+                  videoyuOynat(data.videoId, data.title, 0);
+                } else if (data.type === "music-state") {
+                  if (!ytPlayer || !ytPlayer.seekTo) return;
+                  ignoreStateChange = true;
+                  if (Math.abs(ytPlayer.getCurrentTime() - data.time) > 1.5) {
+                    ytPlayer.seekTo(data.time, true);
+                  }
+                  if (data.action === "pause") {
+                    ytPlayer.pauseVideo();
+                    document.getElementById("now-playing").innerText = "⏸️ Duraklatıldı (Senkronize)";
+                  } else if (data.action === "play") {
+                    ytPlayer.playVideo();
+                    document.getElementById("now-playing").innerText = "🎵 Çalıyor (Senkronize)";
+                  }
+                  setTimeout(function() { ignoreStateChange = false; }, 600);
+                }
               }
 
               function kisiyiAra(targetId, targetName) {
@@ -235,15 +433,15 @@ jobs:
 
               function aramayiYonet(call, remoteName) {
                 call.on("stream", function(remoteStream) {
-                  const nameToShow = peerNames[call.peer] || remoteName || "Arkadaş";
-                  sesMikseriEkle(call.peer, nameToShow, remoteStream);
+                  const nameToShow = (call.metadata && call.metadata.name) || peerNames[call.peer] || remoteName || "Arkadaş";
+                  const rowId = (call.metadata && call.metadata.isMusic) ? ("music-" + call.peer) : call.peer;
+                  sesMikseriEkle(rowId, nameToShow, remoteStream);
                 });
                 call.on("close", function() { kullaniciSil(call.peer); });
               }
 
               function sesMikseriEkle(peerId, name, stream) {
                 if (document.getElementById("user-" + peerId)) return;
-
                 const source = audioCtx.createMediaStreamSource(stream);
                 const gainNode = audioCtx.createGain();
                 source.connect(gainNode);
@@ -286,48 +484,111 @@ jobs:
                 btn.classList.toggle("muted", isMuted);
               }
 
+              // YouTube Player & Birebir Durdur/Baslat Senkronizasyonu + Kesintisiz Radyo Kuyrugu
               function onYouTubeIframeAPIReady() {
                 ytPlayer = new YT.Player("yt-player", {
-                  height: "90", width: "100%",
-                  playerVars: { autoplay: 1, controls: 1 }
+                  height: "110", width: "100%",
+                  playerVars: { autoplay: 1, controls: 1 },
+                  events: {
+                    onStateChange: function(ev) {
+                      if (ignoreStateChange) return;
+                      const curTime = ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0;
+                      if (ev.data === YT.PlayerState.PAUSED) {
+                        herkeseGonder({ type: "music-state", action: "pause", time: curTime });
+                      } else if (ev.data === YT.PlayerState.PLAYING) {
+                        herkeseGonder({ type: "music-state", action: "play", time: curTime });
+                      } else if (ev.data === YT.PlayerState.ENDED) {
+                        // Sarki bittiginde otomatik olarak listedeki siradaki sarkiya gec (Kesintisiz Muzik)
+                        siradakiSarki();
+                      }
+                    }
+                  }
                 });
               }
 
-              async function youtubeBul(query) {
-                const reg = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
-                const match = query.match(reg);
-                if (match && match[1]) return { videoId: match[1], title: "YouTube Şarkısı (" + match[1] + ")" };
-
-                try {
-                  const res = await fetch("https://pipedapi.kavin.rocks/search?q=" + encodeURIComponent(query) + "&filter=music_songs");
-                  const data = await res.json();
-                  if (data.items && data.items.length > 0) {
-                    const item = data.items[0];
-                    const vid = item.url.split("v=")[1] || item.url.split("/").pop();
-                    return { videoId: vid, title: item.title };
-                  }
-                } catch (e) {}
-                return null;
+              function ortakDurdurBaslat() {
+                if (!ytPlayer || !ytPlayer.getPlayerState) return;
+                const state = ytPlayer.getPlayerState();
+                const curTime = ytPlayer.getCurrentTime() || 0;
+                if (state === YT.PlayerState.PLAYING) {
+                  ytPlayer.pauseVideo();
+                  herkeseGonder({ type: "music-state", action: "pause", time: curTime });
+                } else {
+                  ytPlayer.playVideo();
+                  herkeseGonder({ type: "music-state", action: "play", time: curTime });
+                }
               }
 
-              function videoyuOynat(videoId, title) {
-                document.getElementById("now-playing").innerText = "🎵 Çalıyor: " + title;
+              function siradakiSarki() {
+                if (radioQueue.length > 0) {
+                  currentQueueIndex = (currentQueueIndex + 1) % radioQueue.length;
+                  const nextItem = radioQueue[currentQueueIndex];
+                  videoyuOynat(nextItem.videoId, nextItem.title, 0);
+                  herkeseGonder({
+                    type: "music-load",
+                    videoId: nextItem.videoId,
+                    title: nextItem.title,
+                    queue: radioQueue,
+                    index: currentQueueIndex
+                  });
+                }
+              }
+
+              async function youtubeRadyoOlustur(query) {
+                const reg = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+                const match = query.match(reg);
+                if (match && match[1]) {
+                  return [{ videoId: match[1], title: "YouTube Parçası (" + match[1] + ")" }];
+                }
+
+                const apis = [
+                  "https://pipedapi.kavin.rocks/search?q=" + encodeURIComponent(query) + "&filter=music_songs",
+                  "https://pipedapi.tokhmi.xyz/search?q=" + encodeURIComponent(query) + "&filter=videos"
+                ];
+                for (const url of apis) {
+                  try {
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.items && data.items.length > 0) {
+                      return data.items.slice(0, 15).map(function(item) {
+                        const vid = item.url.split("v=")[1] || item.url.split("/").pop();
+                        return { videoId: vid, title: item.title };
+                      });
+                    }
+                  } catch (e) {}
+                }
+                return [];
+              }
+
+              function videoyuOynat(videoId, title, startSeconds) {
+                document.getElementById("now-playing").innerText = "🎵 Çalıyor: " + title + " (Kesintisiz Liste Aktif)";
                 if (ytPlayer && ytPlayer.loadVideoById) {
-                  ytPlayer.loadVideoById(videoId);
+                  ignoreStateChange = true;
+                  ytPlayer.loadVideoById({ videoId: videoId, startSeconds: startSeconds || 0 });
                   ytPlayer.setVolume(document.getElementById("music-vol").value);
+                  setTimeout(function() { ignoreStateChange = false; }, 800);
                 }
               }
 
               async function muzikCal() {
                 const q = document.getElementById("music-query").value.trim();
                 if (!q) return;
-                document.getElementById("now-playing").innerText = "Aranıyor...";
-                const result = await youtubeBul(q);
-                if (result) {
-                  videoyuOynat(result.videoId, result.title);
-                  herkeseGonder({ type: "music", videoId: result.videoId, title: result.title });
+                document.getElementById("now-playing").innerText = "Kesintisiz müzik listesi hazırlanıyor...";
+                const list = await youtubeRadyoOlustur(q);
+                if (list.length > 0) {
+                  radioQueue = list;
+                  currentQueueIndex = 0;
+                  const first = radioQueue[0];
+                  videoyuOynat(first.videoId, first.title, 0);
+                  herkeseGonder({
+                    type: "music-load",
+                    videoId: first.videoId,
+                    title: first.title,
+                    queue: radioQueue,
+                    index: 0
+                  });
                 } else {
-                  document.getElementById("now-playing").innerText = "Bulunamadı, lütfen doğrudan YouTube linki yapıştırın.";
+                  document.getElementById("now-playing").innerText = "Bulunamadı, lütfen başka bir şarkı adı yazın.";
                 }
               }
 
@@ -341,16 +602,36 @@ jobs:
           </html>
           EOF
 
+          # Kapak fotografinin Base64 verisini HTML'in icine gom
+          node -e '
+            const fs = require("fs");
+            const bg = fs.readFileSync("app/src/bg_base64.txt", "utf8");
+            let html = fs.readFileSync("app/src/index.html", "utf8");
+            html = html.split("__BG_BASE64__").join(bg);
+            fs.writeFileSync("app/src/index.html", html);
+          '
+
           cat << 'EOF' > app/src/main.rs
           #![windows_subsystem = "windows"]
           use std::thread;
           use tao::{
             event::{Event, WindowEvent},
             event_loop::{ControlFlow, EventLoop},
-            window::WindowBuilder,
+            window::{WindowBuilder, Icon},
           };
           use wry::WebViewBuilder;
           use tiny_http::{Server, Response, Header};
+
+          fn load_window_icon() -> Option<Icon> {
+            let png_bytes = include_bytes!("icon_raw.bin");
+            if let Ok(img) = image::load_from_memory(png_bytes) {
+              let rgba = img.to_rgba8();
+              let (w, h) = rgba.dimensions();
+              Icon::from_rgba(rgba.into_raw(), w, h).ok()
+            } else {
+              None
+            }
+          }
 
           fn main() -> wry::Result<()> {
             let html_content = include_str!("index.html");
@@ -368,8 +649,9 @@ jobs:
 
             let event_loop = EventLoop::new();
             let window = WindowBuilder::new()
-              .with_title("Ekip Ses v3.0")
-              .with_inner_size(tao::dpi::LogicalSize::new(480.0, 650.0))
+              .with_title("FurkanCELL")
+              .with_window_icon(load_window_icon())
+              .with_inner_size(tao::dpi::LogicalSize::new(500.0, 720.0))
               .build(&event_loop)
               .unwrap();
 
@@ -387,12 +669,12 @@ jobs:
           }
           EOF
 
-      - name: .exe Derle
+      - name: FurkanCELL.exe Derle
         working-directory: ./app
         run: cargo build --release
 
-      - name: .exe Dosyasini Indirmeye Hazirla
+      - name: FurkanCELL.exe Indirmeye Hazirla
         uses: actions/upload-artifact@v4
         with:
-          name: EkipSes-v3-Calisan-Exe
-          path: ./app/target/release/ekip-ses-v3.exe
+          name: FurkanCELL-Windows-Exe
+          path: ./app/target/release/FurkanCELL.exe
