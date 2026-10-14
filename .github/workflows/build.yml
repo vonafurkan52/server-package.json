@@ -17,74 +17,69 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Node.js Kur
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
       - name: Rust Kur
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Tum Uygulamayi Hazirla
+      - name: Dosyalari Dogrudan Olustur
         shell: bash
         run: |
-          cat << 'EOF' > generate.js
-          const fs = require("fs");
-          fs.mkdirSync("app/src", { recursive: true });
+          mkdir -p app/src
 
-          // Gercek 127.0.0.1 sunucusu icin tiny_http eklendi (Mikrofon ve WebRTC izinlerini %100 acar)
-          fs.writeFileSync("app/Cargo.toml", `[package]
-          name = "ekip-ses"
-          version = "1.0.0"
+          cat << 'EOF' > app/Cargo.toml
+          [package]
+          name = "ekip-ses-v3"
+          version = "3.0.0"
           edition = "2021"
 
           [dependencies]
           tao = "0.26"
           wry = "0.37"
           tiny_http = "0.12"
-          `);
+          EOF
 
-          const html = `<!DOCTYPE html>
+          cat << 'EOF' > app/src/index.html
+          <!DOCTYPE html>
           <html lang="tr">
           <head>
             <meta charset="UTF-8" />
-            <title>Ekip Ses & Müzik</title>
+            <title>Ekip Ses v3.0</title>
             <style>
               * { box-sizing: border-box; }
-              body { background: #121214; color: #e1e1e6; font-family: system-ui, sans-serif; padding: 18px; margin: 0; user-select: none; }
+              body { background: #121214; color: #e1e1e6; font-family: system-ui, sans-serif; padding: 16px; margin: 0; }
               h2, h3 { margin-top: 0; color: #fff; }
+              .top-bar { background: #04d361; color: #000; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 12px; margin-bottom: 12px; text-align: center; }
               .box { background: #202024; padding: 16px; border-radius: 10px; margin-bottom: 14px; border: 1px solid #29292e; }
               .row { display: flex; gap: 8px; margin-bottom: 10px; }
-              input[type="text"] { background: #121214; color: white; border: 1px solid #323238; padding: 10px 12px; border-radius: 6px; flex: 1; font-size: 14px; outline: none; }
-              input[type="text"]:focus { border-color: #5865F2; }
-              button { background: #5865F2; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; }
-              button:hover { background: #4752C4; }
+              input[type="text"] { background: #121214; color: white; border: 1px solid #323238; padding: 10px 12px; border-radius: 6px; flex: 1; font-size: 14px; }
+              button { background: #5865F2; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
+              button:active { transform: scale(0.97); }
               button.mute-btn { background: #29292e; }
               button.mute-btn.muted { background: #ed4245; }
               .user-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #29292e; }
-              .slider { width: 120px; accent-color: #5865F2; cursor: pointer; }
+              .slider { width: 110px; accent-color: #5865F2; cursor: pointer; }
               .badge { font-size: 12px; background: #29292e; padding: 4px 8px; border-radius: 4px; color: #a8a8b3; }
               .status { font-size: 13px; color: #04d361; font-weight: 600; }
             </style>
           </head>
           <body>
+            <div class="top-bar" id="sys-bar">✅ SÜRÜM 3.0 AKTİF - SİSTEM HAZIR</div>
+
             <div class="box" id="login-box">
-              <h2>🎧 Ekip Ses & Müzik</h2>
-              <p style="color:#a8a8b3; font-size:13px;">Oyun sesini kısmayan düşük sistem tüketimli özel oda.</p>
+              <h2>🎧 Ekip Ses & Müzik v3</h2>
               <div class="row">
-                <input type="text" id="room-input" value="ekip-oda-1" placeholder="Oda Adı (Arkadaşlarınla aynı olmalı)" />
+                <input type="text" id="room-input" value="ekip-oda-1" placeholder="Oda Adı" />
               </div>
               <div class="row">
-                <input type="text" id="username" placeholder="Takma Adın (Örn: Furkan)" />
-                <button id="join-btn" onclick="startApp()">Odaya Bağlan</button>
+                <input type="text" id="username" value="Furkan" placeholder="Takma Adın" />
+                <button type="button" id="join-btn" onclick="baglan()">Odaya Bağlan</button>
               </div>
             </div>
 
             <div id="app-box" style="display:none;">
               <div class="box">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                  <div class="status" id="room-title">● Bağlanıyor...</div>
-                  <button id="mute-self-btn" class="mute-btn" onclick="toggleMute()">🎤 Mikrofon Açık</button>
+                  <div class="status" id="room-title">● Odaya Girildi</div>
+                  <button type="button" id="mute-self-btn" class="mute-btn" onclick="mikrofonAcKapat()">🎤 Mikrofon Açık</button>
                 </div>
                 <h3>Odadaki Kişiler</h3>
                 <div id="users-list"></div>
@@ -94,162 +89,159 @@ jobs:
                 <h3>🎵 Ortak YouTube Music</h3>
                 <div class="row">
                   <input type="text" id="music-query" placeholder="YouTube linki veya şarkı adı yaz..." />
-                  <button id="play-btn" onclick="triggerMusic()">Herkeste Çal</button>
+                  <button type="button" onclick="muzikCal()">Herkeste Çal</button>
                 </div>
                 <p id="now-playing" style="font-size:13px; color:#04d361; margin: 6px 0;">Şu an çalan: Yok</p>
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px;">
                   <span style="font-size:13px;">Müzik Sesi:</span>
-                  <input type="range" id="music-vol" min="0" max="100" value="35" class="slider" oninput="changeMusicVol(this.value)" />
+                  <input type="range" id="music-vol" min="0" max="100" value="40" class="slider" oninput="sesAyarla(this.value)" />
                 </div>
-                <div id="yt-wrap" style="margin-top:10px; border-radius:8px; overflow:hidden; height:80px; background:#121214; display:none;">
+                <div id="yt-wrap" style="margin-top:10px; border-radius:8px; overflow:hidden; height:90px; background:#000;">
                   <div id="yt-player"></div>
                 </div>
               </div>
             </div>
 
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
-            <script src="https://www.youtube.com/iframe_api"></script>
             <script>
-              let localStream, audioCtx, ytPlayer, isMuted = false;
-              let myPeer, isHost = false;
-              let myName = "Oyuncu";
+              let localStream = null;
+              let audioCtx = null;
+              let ytPlayer = null;
+              let isMuted = false;
+              let myPeer = null;
+              let isHost = false;
+              let myName = "Furkan";
               const connections = {};
-              const mediaCalls = {};
               const peerNames = {};
 
-              function onYouTubeIframeAPIReady() {
-                ytPlayer = new YT.Player("yt-player", {
-                  height: "80", width: "100%",
-                  playerVars: { autoplay: 1, controls: 1 }
-                });
+              // 1. Butona basildigi an HICBIR kutuphaneyi beklemeden ekrani degistir!
+              function baglan() {
+                try {
+                  myName = document.getElementById("username").value.trim() || "Oyuncu";
+                  const rawRoom = document.getElementById("room-input").value.trim().toLowerCase();
+                  const roomName = rawRoom.replace(/[^a-z0-9-]/g, "") || "ekip-oda-1";
+
+                  document.getElementById("login-box").style.display = "none";
+                  document.getElementById("app-box").style.display = "block";
+                  document.getElementById("sys-bar").innerText = "🟢 ODAYA GİRİŞ YAPILDI: " + roomName.toUpperCase();
+
+                  const list = document.getElementById("users-list");
+                  list.innerHTML = '<div class="user-row"><span>🟢 ' + myName + ' (Sen)</span><span class="badge" id="my-mic-badge">Mikrofon Açılıyor...</span></div>';
+
+                  mikrofonuHazirla(roomName);
+                } catch (e) {
+                  document.getElementById("sys-bar").innerText = "Hata: " + e.message;
+                }
               }
 
-              async function startApp() {
-                myName = document.getElementById("username").value.trim() || "Oyuncu-" + Math.floor(Math.random()*100);
-                const rawRoom = document.getElementById("room-input").value.trim().toLowerCase();
-                const roomName = rawRoom.replace(/[^a-z0-9-]/g, "") || "ekip-oda-1";
-
-                // 1. Ekrani HICBİR SEYİ BEKLEMEDEN ANINDA degistir
-                document.getElementById("login-box").style.display = "none";
-                document.getElementById("app-box").style.display = "block";
-                document.getElementById("room-title").innerText = "● Mikrofon hazırlanıyor...";
-
-                // 2. Mikrofonu al (127.0.0.1 uzerinde calistigi icin Windows artik engellemez)
+              async function mikrofonuHazirla(roomName) {
                 try {
                   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                   localStream = await navigator.mediaDevices.getUserMedia({
                     video: false,
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false }
                   });
-                  addSelfRow("Mikrofon Aktif");
+                  document.getElementById("my-mic-badge").innerText = "Mikrofon Aktif";
                 } catch (err) {
                   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                   const dest = audioCtx.createMediaStreamDestination();
                   localStream = dest.stream;
-                  addSelfRow("Dinleyici Modu (Mikrofon Yok)");
+                  document.getElementById("my-mic-badge").innerText = "Dinleyici Modu";
                 }
 
-                // 3. PeerJS Sunucusuna baglan
+                peerBaglantisiniKur(roomName);
+              }
+
+              function peerBaglantisiniKur(roomName) {
                 if (typeof Peer === "undefined") {
-                  document.getElementById("room-title").innerText = "❌ İnternet veya PeerJS bağlantısı kurulamadı!";
+                  document.getElementById("room-title").innerText = "⚠️ Ses sunucusu yükleniyor, lütfen 2 sn bekleyin...";
+                  setTimeout(function() { peerBaglantisiniKur(roomName); }, 1500);
                   return;
                 }
 
-                document.getElementById("room-title").innerText = "● Odaya bağlanılıyor: " + roomName + "...";
-                initRoom(roomName);
-              }
-
-              function addSelfRow(statusText) {
-                const list = document.getElementById("users-list");
-                list.innerHTML = "<div class='user-row'><span>🟢 " + myName + " (Sen)</span><span class='badge'>" + statusText + "</span></div>";
-              }
-
-              function initRoom(roomName) {
-                const hostId = "ekipses-v2-" + roomName;
+                const hostId = "ekipses-v3-room-" + roomName;
                 const tempPeer = new Peer(hostId);
 
-                tempPeer.on("open", () => {
+                tempPeer.on("open", function() {
                   isHost = true;
                   myPeer = tempPeer;
-                  document.getElementById("room-title").innerText = "● Oda: " + roomName + " (Kurucu - Bağlandı)";
-                  setupCommonPeerEvents();
-                  setupHostListeners();
+                  document.getElementById("room-title").innerText = "● Oda: " + roomName + " (Kurucu - Online)";
+                  ortakPeerAyarlari();
+                  hostDinleyicileri();
                 });
 
-                tempPeer.on("error", (err) => {
+                tempPeer.on("error", function(err) {
                   if (err.type === "unavailable-id") {
                     isHost = false;
                     myPeer = new Peer();
-                    myPeer.on("open", () => {
-                      document.getElementById("room-title").innerText = "● Oda: " + roomName + " (Bağlandı)";
-                      setupCommonPeerEvents();
-                      connectToHost(hostId);
+                    myPeer.on("open", function() {
+                      document.getElementById("room-title").innerText = "● Oda: " + roomName + " (Üye - Online)";
+                      ortakPeerAyarlari();
+                      hostaBaglan(hostId);
                     });
                   } else {
-                    document.getElementById("room-title").innerText = "⚠️ Bağlantı Durumu: " + err.type;
+                    document.getElementById("room-title").innerText = "● Durum: " + err.type;
                   }
                 });
               }
 
-              function setupCommonPeerEvents() {
-                myPeer.on("call", (call) => {
+              function ortakPeerAyarlari() {
+                myPeer.on("call", function(call) {
                   call.answer(localStream);
-                  handleCall(call, call.metadata ? call.metadata.name : "Arkadaş");
+                  aramayiYonet(call, call.metadata ? call.metadata.name : "Arkadaş");
                 });
               }
 
-              function setupHostListeners() {
-                myPeer.on("connection", (conn) => {
-                  conn.on("data", (data) => {
+              function hostDinleyicileri() {
+                myPeer.on("connection", function(conn) {
+                  conn.on("data", function(data) {
                     if (data.type === "join") {
                       peerNames[conn.peer] = data.name;
                       connections[conn.peer] = conn;
-                      const existing = Object.keys(connections).filter(k => k !== conn.peer).map(k => ({ id: k, name: peerNames[k] }));
+                      const existing = Object.keys(connections).filter(function(k) { return k !== conn.peer; }).map(function(k) { return { id: k, name: peerNames[k] }; });
                       conn.send({ type: "peer-list", peers: existing, hostName: myName });
-                      callPeer(conn.peer, data.name);
+                      kisiyiAra(conn.peer, data.name);
                     } else if (data.type === "music") {
-                      playVideo(data.videoId, data.title);
-                      broadcastData(data);
+                      videoyuOynat(data.videoId, data.title);
+                      herkeseGonder(data);
                     }
                   });
-                  conn.on("close", () => removeUserUI(conn.peer));
+                  conn.on("close", function() { kullaniciSil(conn.peer); });
                 });
               }
 
-              function connectToHost(hostId) {
+              function hostaBaglan(hostId) {
                 const conn = myPeer.connect(hostId);
                 connections[hostId] = conn;
-                conn.on("open", () => {
+                conn.on("open", function() {
                   conn.send({ type: "join", name: myName });
                 });
-                conn.on("data", (data) => {
+                conn.on("data", function(data) {
                   if (data.type === "peer-list") {
                     peerNames[hostId] = data.hostName;
-                    data.peers.forEach(p => {
+                    data.peers.forEach(function(p) {
                       peerNames[p.id] = p.name;
-                      callPeer(p.id, p.name);
+                      kisiyiAra(p.id, p.name);
                     });
                   } else if (data.type === "music") {
-                    playVideo(data.videoId, data.title);
+                    videoyuOynat(data.videoId, data.title);
                   }
                 });
               }
 
-              function callPeer(targetId, targetName) {
+              function kisiyiAra(targetId, targetName) {
                 const call = myPeer.call(targetId, localStream, { metadata: { name: myName } });
-                handleCall(call, targetName);
+                aramayiYonet(call, targetName);
               }
 
-              function handleCall(call, remoteName) {
-                mediaCalls[call.peer] = call;
-                call.on("stream", (remoteStream) => {
-                  const nameToShow = peerNames[call.peer] || remoteName || "Oyuncu";
-                  setupAudioMixer(call.peer, nameToShow, remoteStream);
+              function aramayiYonet(call, remoteName) {
+                call.on("stream", function(remoteStream) {
+                  const nameToShow = peerNames[call.peer] || remoteName || "Arkadaş";
+                  sesMikseriEkle(call.peer, nameToShow, remoteStream);
                 });
-                call.on("close", () => removeUserUI(call.peer));
+                call.on("close", function() { kullaniciSil(call.peer); });
               }
 
-              function setupAudioMixer(peerId, name, stream) {
+              function sesMikseriEkle(peerId, name, stream) {
                 if (document.getElementById("user-" + peerId)) return;
 
                 const source = audioCtx.createMediaStreamSource(stream);
@@ -260,14 +252,14 @@ jobs:
                 const audio = new Audio();
                 audio.srcObject = stream;
                 audio.muted = true;
-                audio.play().catch(()=>{});
+                audio.play().catch(function(){});
 
                 const list = document.getElementById("users-list");
                 const row = document.createElement("div");
                 row.className = "user-row";
                 row.id = "user-" + peerId;
-                row.innerHTML = "<span>🎙️ " + name + "</span><div style='display:flex;align-items:center;gap:8px;'><span class='badge' id='vol-" + peerId + "'>100%</span><input type='range' min='0' max='2' step='0.05' value='1' class='slider' /></div>";
-                row.querySelector("input").addEventListener("input", (ev) => {
+                row.innerHTML = '<span>🎙️ ' + name + '</span><div style="display:flex;align-items:center;gap:8px;"><span class="badge" id="vol-' + peerId + '">100%</span><input type="range" min="0" max="2" step="0.05" value="1" class="slider" /></div>';
+                row.querySelector("input").addEventListener("input", function(ev) {
                   const val = parseFloat(ev.target.value);
                   gainNode.gain.value = val;
                   document.getElementById("vol-" + peerId).innerText = Math.round(val * 100) + "%";
@@ -275,87 +267,82 @@ jobs:
                 list.appendChild(row);
               }
 
-              function removeUserUI(peerId) {
+              function kullaniciSil(peerId) {
                 delete connections[peerId];
-                delete mediaCalls[peerId];
                 const el = document.getElementById("user-" + peerId);
                 if (el) el.remove();
               }
 
-              function broadcastData(data) {
-                Object.values(connections).forEach(c => { if (c.open) c.send(data); });
+              function herkeseGonder(data) {
+                Object.values(connections).forEach(function(c) { if (c.open) c.send(data); });
               }
 
-              function toggleMute() {
+              function mikrofonAcKapat() {
                 if (!localStream) return;
                 isMuted = !isMuted;
-                localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+                localStream.getAudioTracks().forEach(function(t) { t.enabled = !isMuted; });
                 const btn = document.getElementById("mute-self-btn");
                 btn.innerText = isMuted ? "🔇 Mikrofon Kapalı" : "🎤 Mikrofon Açık";
                 btn.classList.toggle("muted", isMuted);
               }
 
-              async function resolveYouTube(query) {
+              function onYouTubeIframeAPIReady() {
+                ytPlayer = new YT.Player("yt-player", {
+                  height: "90", width: "100%",
+                  playerVars: { autoplay: 1, controls: 1 }
+                });
+              }
+
+              async function youtubeBul(query) {
                 const reg = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
                 const match = query.match(reg);
-                if (match && match[1]) return { videoId: match[1], title: "YouTube (" + match[1] + ")" };
+                if (match && match[1]) return { videoId: match[1], title: "YouTube Şarkısı (" + match[1] + ")" };
 
-                const apis = [
-                  "https://pipedapi.kavin.rocks/search?q=" + encodeURIComponent(query) + "&filter=music_songs",
-                  "https://pipedapi.tokhmi.xyz/search?q=" + encodeURIComponent(query) + "&filter=videos"
-                ];
-                for (const url of apis) {
-                  try {
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    if (data.items && data.items.length > 0) {
-                      const item = data.items[0];
-                      const vid = item.url.split("v=")[1] || item.url.split("/").pop();
-                      return { videoId: vid, title: item.title };
-                    }
-                  } catch (e) {}
-                }
+                try {
+                  const res = await fetch("https://pipedapi.kavin.rocks/search?q=" + encodeURIComponent(query) + "&filter=music_songs");
+                  const data = await res.json();
+                  if (data.items && data.items.length > 0) {
+                    const item = data.items[0];
+                    const vid = item.url.split("v=")[1] || item.url.split("/").pop();
+                    return { videoId: vid, title: item.title };
+                  }
+                } catch (e) {}
                 return null;
               }
 
-              function playVideo(videoId, title) {
+              function videoyuOynat(videoId, title) {
                 document.getElementById("now-playing").innerText = "🎵 Çalıyor: " + title;
-                document.getElementById("yt-wrap").style.display = "block";
                 if (ytPlayer && ytPlayer.loadVideoById) {
                   ytPlayer.loadVideoById(videoId);
                   ytPlayer.setVolume(document.getElementById("music-vol").value);
                 }
               }
 
-              async function triggerMusic() {
+              async function muzikCal() {
                 const q = document.getElementById("music-query").value.trim();
                 if (!q) return;
-                document.getElementById("now-playing").innerText = "Şarkı aranıyor...";
-                const result = await resolveYouTube(q);
+                document.getElementById("now-playing").innerText = "Aranıyor...";
+                const result = await youtubeBul(q);
                 if (result) {
-                  playVideo(result.videoId, result.title);
-                  broadcastData({ type: "music", videoId: result.videoId, title: result.title });
-                  if (!isHost) {
-                    Object.values(connections).forEach(c => {
-                      if (c.open) c.send({ type: "music", videoId: result.videoId, title: result.title });
-                    });
-                  }
+                  videoyuOynat(result.videoId, result.title);
+                  herkeseGonder({ type: "music", videoId: result.videoId, title: result.title });
                 } else {
-                  document.getElementById("now-playing").innerText = "Bulunamadı. Lütfen doğrudan YouTube linki yapıştırın.";
+                  document.getElementById("now-playing").innerText = "Bulunamadı, lütfen doğrudan YouTube linki yapıştırın.";
                 }
               }
 
-              function changeMusicVol(val) {
+              function sesAyarla(val) {
                 if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(val);
               }
             </script>
+            <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js" async></script>
+            <script src="https://www.youtube.com/iframe_api" async></script>
           </body>
-          </html>`;
+          </html>
+          EOF
 
-          fs.writeFileSync("app/src/index.html", html);
-
-          // Uygulama icinde gomulu mini localhost sunucusu (WebView2'nin tum mikrofon ve YouTube izinlerini acar)
-          fs.writeFileSync("app/src/main.rs", `#![windows_subsystem = "windows"]
+          cat << 'EOF' > app/src/main.rs
+          #![windows_subsystem = "windows"]
           use std::thread;
           use tao::{
             event::{Event, WindowEvent},
@@ -381,8 +368,8 @@ jobs:
 
             let event_loop = EventLoop::new();
             let window = WindowBuilder::new()
-              .with_title("Ekip Ses & Müzik")
-              .with_inner_size(tao::dpi::LogicalSize::new(480.0, 640.0))
+              .with_title("Ekip Ses v3.0")
+              .with_inner_size(tao::dpi::LogicalSize::new(480.0, 650.0))
               .build(&event_loop)
               .unwrap();
 
@@ -398,9 +385,7 @@ jobs:
               }
             });
           }
-          `);
           EOF
-          node generate.js
 
       - name: .exe Derle
         working-directory: ./app
@@ -409,5 +394,5 @@ jobs:
       - name: .exe Dosyasini Indirmeye Hazirla
         uses: actions/upload-artifact@v4
         with:
-          name: EkipSes-Windows-Exe
-          path: ./app/target/release/ekip-ses.exe
+          name: EkipSes-v3-Calisan-Exe
+          path: ./app/target/release/ekip-ses-v3.exe
