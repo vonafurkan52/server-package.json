@@ -8,80 +8,13 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Node.js Kur
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Rust Kur
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Tum Uygulamayi Hazirla
-        shell: bash
+      - name: Dosyalari Olustur ve .exe Derle
+        shell: cmd
         run: |
-          cat << 'EOF' > generate.js
-          const fs = require("fs");
-          fs.mkdirSync("app/src", { recursive: true });
-
-          fs.writeFileSync("app/Cargo.toml", [
-            '[package]',
-            'name = "FurkanCELL"',
-            'version = "6.3.0"',
-            'edition = "2021"',
-            '',
-            '[dependencies]',
-            'tao = "0.26"',
-            'wry = "0.37"',
-            'tiny_http = "0.12"'
-          ].join("\n"));
-
-          fs.writeFileSync("app/src/main.rs", [
-            '#![windows_subsystem = "windows"]',
-            'use std::thread;',
-            'use tao::{',
-            '  event::{Event, WindowEvent},',
-            '  event_loop::{ControlFlow, EventLoop},',
-            '  window::WindowBuilder,',
-            '};',
-            'use wry::WebViewBuilder;',
-            'use tiny_http::{Server, Response, Header};',
-            '',
-            'fn main() -> wry::Result<()> {',
-            '  let html_content = include_str!("index.html");',
-            '  let server = Server::http("127.0.0.1:0").unwrap();',
-            '  let port = server.server_addr().to_ip().unwrap().port();',
-            '',
-            '  thread::spawn(move || {',
-            '    for request in server.incoming_requests() {',
-            '      let header = Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]).unwrap();',
-            '      let response = Response::from_string(html_content).with_header(header);',
-            '      let _ = request.respond(response);',
-            '    }',
-            '  });',
-            '',
-            '  let event_loop = EventLoop::new();',
-            '  let window = WindowBuilder::new()',
-            '    .with_title("FurkanCELL v6.3")',
-            '    .with_inner_size(tao::dpi::LogicalSize::new(540.0, 820.0))',
-            '    .build(&event_loop)',
-            '    .unwrap();',
-            '',
-            '  let url = format!("http://127.0.0.1:{}", port);',
-            '  let _webview = WebViewBuilder::new(&window)',
-            '    .with_url(&url)',
-            '    .build()?;',
-            '',
-            '  event_loop.run(move |event, _, control_flow| {',
-            '    *control_flow = ControlFlow::Wait;',
-            '    if let Event::WindowEvent { event: WindowEvent::CloseRequested, .. } = event {',
-            '      *control_flow = ControlFlow::Exit;',
-            '    }',
+          node -e "const fs=require('fs');fs.mkdirSync('app/src',{recursive:true});fs.writeFileSync('app/Cargo.toml','[package]\nname=\"FurkanCELL\"\nversion=\"6.4.0\"\nedition=\"2021\"\n[dependencies]\ntao=\"0.26\"\nwry=\"0.37\"\ntiny_http=\"0.12\"\n');"
+          node -e "const fs=require('fs');fs.writeFileSync('app/src/main.rs','#![windows_subsystem=\"windows\"]\nuse std::thread;\nuse tao::{event::{Event,WindowEvent},event_loop::{ControlFlow,EventLoop},window::WindowBuilder};\nuse wry::WebViewBuilder;\nuse tiny_http::{Server,Response,Header};\nfn main()->wry::Result<()>{let html=include_str!(\"index.html\");let srv=Server::http(\"127.0.0.1:0\").unwrap();let port=srv.server_addr().to_ip().unwrap().port();thread::spawn(move||{for req in srv.incoming_requests(){let h=Header::from_bytes(&b\"Content-Type\"[..],&b\"text/html; charset=utf-8\"[..]).unwrap();let _=req.respond(Response::from_string(html).with_header(h));}});let el=EventLoop::new();let w=WindowBuilder::new().with_title(\"FurkanCELL v6.4\").with_inner_size(tao::dpi::LogicalSize::new(540.0,820.0)).build(&el).unwrap();let url=format!(\"http://127.0.0.1:{}\",port);let _wv=WebViewBuilder::new(&w).with_url(&url).build()?;el.run(move|ev,_,cf|{*cf=ControlFlow::Wait;if let Event::WindowEvent{event:WindowEvent::CloseRequested,..}=ev{*cf=ControlFlow::Exit;}});}');"
+          node -e "const fs=require('fs');const h=`<!DOCTYPE html><html lang='tr'><head><meta charset='UTF-8'><title>FurkanCELL v6.4</title><style>*{box-sizing:border-box}body{background:radial-gradient(circle at top right,#4a0e2e,#1a0510 70%);color:#ffe6f2;font-family:system-ui,sans-serif;padding:16px;margin:0;min-height:100vh;overflow-x:hidden}h2,h3{margin-top:0;color:#ff85c0}.top-bar{background:linear-gradient(90deg,#ff1493,#ff69b4);color:#fff;padding:8px 12px;border-radius:8px;font-weight:bold;font-size:13px;margin-bottom:14px;text-align:center}.box{background:rgba(43,9,26,0.92);padding:14px;border-radius:12px;margin-bottom:12px;border:1px solid #ff2a85}.row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}input[type='text']{background:#14030c;color:#fff;border:1px solid #b81d62;padding:10px 12px;border-radius:8px;flex:1;font-size:14px;outline:none}button{background:linear-gradient(135deg,#ff1493,#d6006e);color:white;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:bold;font-size:12px}button.secondary-btn{background:#4a122f;border:1px solid #ff2a85}button.mute-btn{background:#4a122f;border:1px solid #ff69b4}button.mute-btn.muted{background:#e60026;border-color:#ff4d4d}.fx-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}.fx-btn{background:#33081e;border:1px solid #801348;padding:8px 6px;font-size:12px;border-radius:8px;text-align:center}.fx-btn.active{background:linear-gradient(135deg,#ff1493,#ff69b4);border-color:#fff}.user-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,42,133,0.25)}.slider{width:110px;accent-color:#ff1493;cursor:pointer}.badge{font-size:11px;background:#590d32;padding:4px 8px;border-radius:6px;color:#ffb3d9;border:1px solid #ff2a85}.status{font-size:13px;color:#ff85c0;font-weight:bold}#chat-box{height:100px;overflow-y:auto;background:#14030c;border:1px solid #b81d62;border-radius:8px;padding:8px;margin-bottom:8px;font-size:13px}.chat-msg{margin-bottom:4px;word-break:break-all}.chat-msg span{font-weight:bold;color:#ff85c0}#screen-wrap{display:none;margin-top:10px;border-radius:8px;overflow:hidden;background:#000;border:2px solid #ff2a85;position:relative}.screen-toolbar{display:flex;justify-content:space-between;align-items:center;background:#2b091a;padding:6px 10px;border-bottom:1px solid #ff2a85}#remote-screen{width:100%;max-height:260px;object-fit:contain;display:block;background:#000;cursor:pointer}#screen-wrap.cinema-fullscreen{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;z-index:99999!important;margin:0!important;border:none!important;border-radius:0!important;display:flex!important;flex-direction:column!important;background:#000!important}#screen-wrap.cinema-fullscreen #remote-screen{flex:1!important;max-height:calc(100vh - 42px)!important;width:100vw!important}</style></head><body><div class='top-bar' id='sys-bar'>FurkanCELL v6.4 - Tam Ekran ve Ses Degistirici</div><div class='box' id='login-box'><h2>FurkanCELL Giris</h2><div class='row'><input type='text' id='room-input' value='furkancell-1' placeholder='Oda Adi'></div><div class='row'><input type='text' id='username' placeholder='Takma Adin (Orn: Furkan, Baran...)'><button type='button' id='btn-join'>Odaya Giris Yap</button></div></div><div id='app-box' style='display:none'><div class='box'><div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'><div class='status' id='room-title'>FurkanCELL Odasi</div><div style='display:flex;gap:6px'><button type='button' class='secondary-btn' id='btn-screen'>Ekran Paylas</button><button type='button' id='mute-self-btn' class='mute-btn'>Mikrofon Acik</button></div></div><h3>Odadaki Kisiler</h3><div id='users-list'></div><div id='screen-wrap'><div class='screen-toolbar'><span style='font-size:12px;color:#ffb3d9;font-weight:bold' id='screen-label'>Canli Ekran Paylasimi (Cift tikla buyut)</span><button type='button' id='fs-btn' style='padding:5px 10px;font-size:11px'>Tam Ekran Yap</button></div><video id='remote-screen' autoplay playsinline></video></div></div><div class='box'><div style='display:flex;justify-content:space-between;align-items:center'><h3 style='margin:0'>Ses Degistirici (Voice Changer)</h3><span class='badge' id='active-fx-label'>Aktif: Normal Ses</span></div><div class='fx-grid'><button type='button' class='fx-btn active' data-fx='normal' data-label='Normal Ses'>Normal</button><button type='button' class='fx-btn' data-fx='robot' data-label='Robot Sesi'>Robot</button><button type='button' class='fx-btn' data-fx='pirate' data-label='Korsan / Dev'>Korsan / Dev</button><button type='button' class='fx-btn' data-fx='chipmunk' data-label='Sincap (Helyum)'>Sincap</button><button type='button' class='fx-btn' data-fx='radio' data-label='Polis Telsizi'>Telsiz</button><button type='button' class='fx-btn' data-fx='cave' data-label='Magara Yankisi'>Magara</button></div></div><div class='box'><h3>Oda Yazismasi</h3><div id='chat-box'></div><div class='row' style='margin-bottom:0'><input type='text' id='chat-input' placeholder='Mesaj yaz...'><button type='button' id='btn-chat'>Gonder</button></div></div><div class='box'><h3>FurkanCELL Senkronize Muzik</h3><div class='row'><input type='text' id='music-query' placeholder='YouTube sarki adi veya link yaz...'><button type='button' id='btn-music-play'>Kesintisiz Baslat</button></div><div class='row' style='justify-content:space-between'><button type='button' class='secondary-btn' id='btn-music-toggle'>Herkeste Durdur / Baslat</button><button type='button' class='secondary-btn' id='btn-music-next'>Siradaki Sarki</button></div><p id='now-playing' style='font-size:13px;color:#ff85c0;font-weight:bold;margin:6px 0'>Su an calan: Yok</p><div style='display:flex;align-items:center;justify-content:space-between;margin-top:8px'><span style='font-size:13px'>Muzik Sesi:</span><input type='range' id='music-vol' min='0' max='100' value='45' class='slider'></div><div id='yt-wrap' style='margin-top:10px;border-radius:8px;overflow:hidden;height:95px;background:#000;border:1px solid #ff2a85'><div id='yt-player'></div></div></div></div><script src='https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js'></script><script src='https://www.youtube.com/iframe_api'></script><script>let rawMicStream=null,localStream=null,screenStream=null,audioCtx=null,micSourceNode=null,processedDestNode=null,activeEffectNodes=[],activeEffectOsc=null,ytPlayer=null,isMuted=false,myPeer=null,isHost=false,myName='Oyuncu',ignoreStateChange=false,radioQueue=[],currentQueueIndex=0;const connections={},peerNames={};function tamEkranYap(){const w=document.getElementById('screen-wrap'),b=document.getElementById('fs-btn');if(w.classList.contains('cinema-fullscreen')){w.classList.remove('cinema-fullscreen');b.innerText='Tam Ekran Yap';if(document.fullscreenElement)document.exitFullscreen().catch(function(){});}else{w.classList.add('cinema-fullscreen');b.innerText='Tam Ekrandan Cik (ESC)';if(w.requestFullscreen)w.requestFullscreen().catch(function(){});}}document.getElementById('fs-btn').addEventListener('click',tamEkranYap);document.getElementById('remote-screen').addEventListener('dblclick',tamEkranYap);document.addEventListener('keydown',function(e){if(e.key==='Escape'){document.getElementById('screen-wrap').classList.remove('cinema-fullscreen');document.getElementById('fs-btn').innerText='Tam Ekran Yap';}});function sesIslemcisiniKur(s){micSourceNode=audioCtx.createMediaStreamSource(s);processedDestNode=audioCtx.createMediaStreamDestination();sesEfektiUygula('normal');return processedDestNode.stream;}function temizleEfektDugumleri(){if(micSourceNode){try{micSourceNode.disconnect();}catch(e){}}activeEffectNodes.forEach(function(n){try{n.disconnect();}catch(e){}});activeEffectNodes=[];if(activeEffectOsc){try{activeEffectOsc.stop();activeEffectOsc.disconnect();}catch(e){}activeEffectOsc=null;}}function makeDistortionCurve(a){const k=a||50,n=44100,c=new Float32Array(n),d=Math.PI/180;for(let i=0;i<n;i++){const x=(i*2)/n-1;c[i]=((3+k)*x*20*d)/(Math.PI+k*Math.abs(x));}return c;}function sesEfektiUygula(m){if(!micSourceNode||!processedDestNode)return;temizleEfektDugumleri();if(m==='normal'){micSourceNode.connect(processedDestNode);}else if(m==='robot'){const rg=audioCtx.createGain();rg.gain.value=0;const o=audioCtx.createOscillator();o.type='sawtooth';o.frequency.value=55;o.connect(rg.gain);o.start();activeEffectOsc=o;const og=audioCtx.createGain();og.gain.value=1.6;micSourceNode.connect(rg);rg.connect(og);og.connect(processedDestNode);activeEffectNodes.push(rg,og);}else if(m==='pirate'||m==='chipmunk'){const p=audioCtx.createScriptProcessor(2048,1,1),pr=(m==='pirate')?0.68:1.55,bs=8192,db=new Float32Array(bs);let wp=0,rp=0;p.onaudioprocess=function(e){const inp=e.inputBuffer.getChannelData(0),out=e.outputBuffer.getChannelData(0);for(let i=0;i<inp.length;i++){db[wp]=inp[i];wp=(wp+1)%bs;const ii=Math.floor(rp),fr=rp-ii,ni=(ii+1)%bs;out[i]=db[ii]*(1-fr)+db[ni]*fr;rp=(rp+pr)%bs;}};if(m==='pirate'){const lf=audioCtx.createBiquadFilter();lf.type='lowshelf';lf.frequency.value=280;lf.gain.value=10;micSourceNode.connect(p);p.connect(lf);lf.connect(processedDestNode);activeEffectNodes.push(p,lf);}else{micSourceNode.connect(p);p.connect(processedDestNode);activeEffectNodes.push(p);}}else if(m==='radio'){const b=audioCtx.createBiquadFilter();b.type='bandpass';b.frequency.value=1400;b.Q.value=3.0;const sh=audioCtx.createWaveShaper();sh.curve=makeDistortionCurve(120);const g=audioCtx.createGain();g.gain.value=1.4;micSourceNode.connect(b);b.connect(sh);sh.connect(g);g.connect(processedDestNode);activeEffectNodes.push(b,sh,g);}else if(m==='cave'){const dl=audioCtx.createDelay();dl.delayTime.value=0.22;const fb=audioCtx.createGain();fb.gain.value=0.48;micSourceNode.connect(processedDestNode);micSourceNode.connect(dl);dl.connect(fb);fb.connect(dl);dl.connect(processedDestNode);activeEffectNodes.push(dl,fb);}}document.querySelectorAll('.fx-btn').forEach(function(btn){btn.addEventListener('click',function(){const fx=btn.getAttribute('data-fx'),lbl=btn.getAttribute('data-label');document.getElementById('active-fx-label').innerText='Aktif: '+lbl;document.querySelectorAll('.fx-btn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');sesEfektiUygula(fx);});});
