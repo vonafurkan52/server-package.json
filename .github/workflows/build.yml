@@ -25,65 +25,21 @@ jobs:
       - name: Rust Kur
         uses: dtolnay/rust-toolchain@stable
 
-      - name: FurkanCELL v6.0 Yerel Simgesini ve Arka Plani Olustur
-        shell: powershell
-        run: |
-          New-Item -ItemType Directory -Force -Path "app/src"
-          Add-Type -AssemblyName System.Drawing
-
-          $srcBmp = New-Object System.Drawing.Bitmap(256, 256)$g = [System.Drawing.Graphics]::FromImage($srcBmp)$brushBg = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 43, 9, 26))
-          $g.FillRectangle($brushBg, 0, 0, 256, 256)
-
-          $brushPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 255, 20, 147), 16)
-          $g.DrawEllipse($brushPen, 40, 40, 176, 176)
-
-          $font = New-Object System.Drawing.Font("Arial", 110, [System.Drawing.FontStyle]::Bold)
-          $brushText = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 255, 230, 240))
-          $g.DrawString("F", $font, $brushText, 70, 45)$g.Dispose()
-
-          $msBg = New-Object System.IO.MemoryStream
-          $srcBmp.Save($msBg, [System.Drawing.Imaging.ImageFormat]::Jpeg)
-          $base64Bg = [Convert]::ToBase64String($msBg.ToArray())
-          Set-Content -Path "app/src/bg_base64.txt" -Value $base64Bg -NoNewline
-
-          $iconBmp = New-Object System.Drawing.Bitmap($srcBmp, 256, 256)$msPng = New-Object System.IO.MemoryStream
-          $iconBmp.Save($msPng, [System.Drawing.Imaging.ImageFormat]::Png)
-          $pngBytes =$msPng.ToArray()
-          [System.IO.File]::WriteAllBytes("app/src/icon_raw.bin", $pngBytes)
-
-          $fsIco = [System.IO.File]::Create("app/icon.ico")
-          $bw = New-Object System.IO.BinaryWriter($fsIco)
-          $bw.Write([Int16]0);$bw.Write([Int16]1); $bw.Write([Int16]1)$bw.Write([Byte]0); $bw.Write([Byte]0);$bw.Write([Byte]0); $bw.Write([Byte]0)$bw.Write([Int16]1); $bw.Write([Int16]32)$bw.Write([Int32]$pngBytes.Length)$bw.Write([Int32]22)
-          $bw.Write($pngBytes)
-          $bw.Close()$srcBmp.Dispose()
-
-      - name: FurkanCELL v6.0 Uygulama Kodlarini Olustur
+      - name: FurkanCELL v6.1 Dosyalarini Hatasiz Olustur
         shell: bash
         run: |
+          mkdir -p app/src
+
           cat << 'EOF' > app/Cargo.toml
           [package]
           name = "FurkanCELL"
-          version = "6.0.0"
+          version = "6.1.0"
           edition = "2021"
-
-          [build-dependencies]
-          winres = "0.1"
 
           [dependencies]
           tao = "0.26"
           wry = "0.37"
           tiny_http = "0.12"
-          image = "0.24"
-          EOF
-
-          cat << 'EOF' > app/build.rs
-          fn main() {
-            if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "windows" {
-              let mut res = winres::WindowsResource::new();
-              res.set_icon("icon.ico");
-              let _ = res.compile();
-            }
-          }
           EOF
 
           cat << 'EOF' > app/src/index.html
@@ -91,33 +47,19 @@ jobs:
           <html lang="tr">
           <head>
             <meta charset="UTF-8" />
-            <title>FurkanCELL v6.0</title>
+            <title>FurkanCELL v6.1</title>
             <style>
               * { box-sizing: border-box; }
               body {
-                background-color: #1a0510;
+                background: radial-gradient(circle at top right, #4a0e2e, #1a0510 70%);
                 color: #ffe6f2;
                 font-family: 'Segoe UI', system-ui, sans-serif;
                 padding: 16px;
                 margin: 0;
-                position: relative;
                 min-height: 100vh;
                 overflow-x: hidden;
               }
-              body::before {
-                content: "";
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background-image: url("data:image/jpeg;base64,__BG_BASE64__");
-                background-size: cover;
-                background-position: center;
-                background-repeat: no-repeat;
-                opacity: 0.15;
-                pointer-events: none;
-                z-index: 0;
-              }
-              .content-wrap { position: relative; z-index: 1; }
-              h2, h3 { margin-top: 0; color: #ff85c0; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+              h2, h3 { margin-top: 0; color: #ff85c0; }
               .top-bar {
                 background: linear-gradient(90deg, #ff1493, #ff69b4);
                 color: #fff;
@@ -130,8 +72,7 @@ jobs:
                 box-shadow: 0 4px 12px rgba(255, 20, 147, 0.35);
               }
               .box {
-                background: rgba(43, 9, 26, 0.88);
-                backdrop-filter: blur(8px);
+                background: rgba(43, 9, 26, 0.9);
                 padding: 14px;
                 border-radius: 12px;
                 margin-bottom: 12px;
@@ -140,7 +81,7 @@ jobs:
               }
               .row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
               input[type="text"] {
-                background: rgba(20, 3, 12, 0.9);
+                background: #14030c;
                 color: #fff;
                 border: 1px solid #b81d62;
                 padding: 10px 12px;
@@ -149,15 +90,6 @@ jobs:
                 font-size: 14px;
                 outline: none;
               }
-              input[type="text"]:focus { border-color: #ff69b4; box-shadow: 0 0 8px rgba(255,105,180,0.4); }
+              input[type="text"]:focus { border-color: #ff69b4; }
               button {
-                background: linear-gradient(135deg, #ff1493, #d6006e);
-                color: white;
-                border: none;
-                padding: 9px 14px;
-                border-radius: 8px;
-                cursor: pointer;
-                font-weight: bold;
-                font-size: 12px;
-                transition: 0.15s;
-                box
+              
